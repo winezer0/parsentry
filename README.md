@@ -9,6 +9,8 @@ Vulnhuntrs is a security analysis tool designed to detect vulnerabilities in app
 - Detailed vulnerability reports
 - Example vulnerable applications for testing
 
+![analyze-python](./analyze-python.png)
+
 ## Installation
 
 ```bash
@@ -22,7 +24,7 @@ cargo build --release
 ## Usage
 
 ```bash
-vulnhuntrs analyze -r <path-to-project>
+vulnhuntrs -r <path-to-project>
 ```
 
 ## Example Applications
@@ -30,7 +32,16 @@ vulnhuntrs analyze -r <path-to-project>
 The repository includes example vulnerable applications to demonstrate the tool's capabilities:
 
 - `example/python-vulnerable-app`: A Python application with common vulnerabilities
+```bash
+export ANTHROPIC_API_KEY=your-api-key
+./target/release/vulnhuntrs -r example/python-vulnerable-app
+```
+
 - `example/rust-vulnerable-app`: A Rust application with common vulnerabilities
+```bash
+export OPENAI_API_KEY=your-api-key
+./target/release/vulnhuntrs -r example/rust-vulnerable-app -l gpt
+```
 
 These examples are for educational purposes only. Do not use them in production environments.
 

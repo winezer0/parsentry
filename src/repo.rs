@@ -1,6 +1,9 @@
 use anyhow::Result;
 use regex::Regex;
-use std::path::PathBuf;
+use std::{
+    fs::{self, read_dir},
+    path::{Path, PathBuf},
+};
 
 pub struct RepoOps {
     repo_path: PathBuf,
@@ -62,18 +65,29 @@ impl RepoOps {
         }
     }
 
-    pub fn get_readme_content(&self) -> Option<String> {
-        let patterns = [
-            "[Rr][Ee][Aa][Dd][Mm][Ee].[Mm][Dd]",
-            "[Rr][Ee][Aa][Dd][Mm][Ee].[Rr][Ss][Tt]",
-        ];
+    fn visit_dirs(&self, dir: &Path, cb: &mut dyn FnMut(&Path)) -> std::io::Result<()> {
+        if dir.is_dir() {
+            for entry in read_dir(dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_dir() {
+                    self.visit_dirs(&path, cb)?;
+                } else {
+                    cb(&path);
+                }
+            }
+        }
+        Ok(())
+    }
 
-        for pattern in patterns {
-            if let Ok(entries) = glob::glob(&format!("{}/{}", self.repo_path.display(), pattern)) {
-                for entry in entries.flatten() {
-                    if let Ok(content) = std::fs::read_to_string(&entry) {
-                        return Some(content);
-                    }
+    pub fn get_readme_content(&self) -> Option<String> {
+        let readme_names = ["README.md", "README.MD", "Readme.md", "readme.md"];
+
+        for name in readme_names {
+            let readme_path = self.repo_path.join(name);
+            if readme_path.exists() {
+                if let Ok(content) = fs::read_to_string(&readme_path) {
+                    return Some(content);
                 }
             }
         }
@@ -82,14 +96,12 @@ impl RepoOps {
 
     pub fn get_relevant_files(&self) -> Vec<PathBuf> {
         let mut files = Vec::new();
-        let walker = walkdir::WalkDir::new(&self.repo_path);
 
-        for entry in walker.into_iter().filter_map(|e| e.ok()) {
-            let path = entry.path().to_path_buf();
+        let mut callback = |path: &Path| {
             if let Some(ext) = path.extension() {
                 let ext_str = ext.to_string_lossy().to_lowercase();
                 if !self.supported_extensions.contains(&ext_str) {
-                    continue;
+                    return;
                 }
 
                 let path_str = path.to_string_lossy().to_lowercase();
@@ -99,7 +111,7 @@ impl RepoOps {
                     .iter()
                     .any(|exclude| path_str.contains(exclude))
                 {
-                    continue;
+                    return;
                 }
 
                 if let Some(file_name) = path.file_name() {
@@ -109,13 +121,18 @@ impl RepoOps {
                         .iter()
                         .any(|exclude| file_name.contains(exclude))
                     {
-                        continue;
+                        return;
                     }
                 }
 
-                files.push(path);
+                files.push(path.to_path_buf());
             }
+        };
+
+        if let Err(e) = self.visit_dirs(&self.repo_path, &mut callback) {
+            eprintln!("Error walking directory: {}", e);
         }
+
         files
     }
 
@@ -123,7 +140,7 @@ impl RepoOps {
         let mut network_files = Vec::new();
 
         for file_path in files {
-            if let Ok(content) = std::fs::read_to_string(file_path) {
+            if let Ok(content) = fs::read_to_string(file_path) {
                 if self
                     .compiled_patterns
                     .iter()
@@ -149,19 +166,18 @@ impl RepoOps {
             }
             Ok(vec![])
         } else if path_to_analyze.is_dir() {
-            Ok(walkdir::WalkDir::new(path_to_analyze)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    if let Some(ext) = e.path().extension() {
-                        let ext_str = ext.to_string_lossy().to_lowercase();
-                        self.supported_extensions.contains(&ext_str)
-                    } else {
-                        false
+            let mut files = Vec::new();
+            let mut callback = |path: &Path| {
+                if let Some(ext) = path.extension() {
+                    let ext_str = ext.to_string_lossy().to_lowercase();
+                    if self.supported_extensions.contains(&ext_str) {
+                        files.push(path.to_path_buf());
                     }
-                })
-                .map(|e| e.path().to_path_buf())
-                .collect())
+                }
+            };
+
+            self.visit_dirs(&path_to_analyze, &mut callback)?;
+            Ok(files)
         } else {
             anyhow::bail!(
                 "Specified analyze path does not exist: {}",

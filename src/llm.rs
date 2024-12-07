@@ -221,7 +221,7 @@ pub fn initialize_llm(llm_arg: &str, system_prompt: &str) -> Result<Box<dyn LLM>
     match llm_arg.to_lowercase().as_str() {
         "claude" => {
             let model = std::env::var("ANTHROPIC_MODEL")
-                .unwrap_or_else(|_| "claude-3-sonnet-20240229".to_string());
+                .unwrap_or_else(|_| "claude-3.5-sonnet-20241022".to_string());
             let base_url = std::env::var("ANTHROPIC_BASE_URL")
                 .unwrap_or_else(|_| "https://api.anthropic.com/v1/messages".to_string());
             Ok(Box::new(Claude::new(
@@ -232,7 +232,7 @@ pub fn initialize_llm(llm_arg: &str, system_prompt: &str) -> Result<Box<dyn LLM>
         }
         "gpt" => {
             let model =
-                std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4-turbo-preview".to_string());
+                std::env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4o-latest".to_string());
             let base_url = std::env::var("OPENAI_BASE_URL")
                 .unwrap_or_else(|_| "https://api.openai.com/v1/chat/completions".to_string());
             Ok(Box::new(ChatGPT::new(

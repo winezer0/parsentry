@@ -9,7 +9,12 @@ mod symbol_finder;
 use anyhow::Result;
 use clap::Parser;
 use log::{info, warn};
-use std::path::PathBuf;
+use std::{
+    env,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::PathBuf,
+};
 
 use analyzer::analyze_file;
 use llm::initialize_llm;
@@ -37,10 +42,26 @@ struct Args {
     verbosity: u8,
 }
 
+fn load_env_file() -> Result<()> {
+    if let Ok(file) = File::open(".env") {
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            let line = line?;
+            if line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+            if let Some((key, value)) = line.split_once('=') {
+                env::set_var(key.trim(), value.trim());
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    dotenv::dotenv().ok();
+    load_env_file()?;
 
     let args = Args::parse();
     let repo = RepoOps::new(args.root.clone());
