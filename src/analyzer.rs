@@ -107,6 +107,10 @@ pub async fn analyze_file(
                 }
 
                 previous_analysis = vuln_response.analysis;
+
+                if vuln_response.confidence_score >= 95 {
+                    break;
+                }
             }
         }
     }
