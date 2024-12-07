@@ -39,13 +39,13 @@ vulnhuntrs -r <path-to-project>
 
 The repository includes example vulnerable applications to demonstrate the tool's capabilities:
 
-- `example/python-vulnerable-app`: A Python application with common vulnerabilities
+- Python app(`example/python-vulnerable-app`)+ Claude 3.5 Sonnet 20241022
 ```bash
 export ANTHROPIC_API_KEY=your-api-key
 cargo run -- -r example/python-vulnerable-app
 ```
 
-- `example/rust-vulnerable-app`: A Rust application with common vulnerabilities
+- Rust app(`example/rust-vulnerable-app`) + GPT-4o-latest
 ```bash
 export OPENAI_API_KEY=your-api-key
 cargo run -- -r example/rust-vulnerable-app -l gpt
