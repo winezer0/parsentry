@@ -64,7 +64,7 @@ This tool is intended for security research and educational purposes only. Do no
 
 ## License
 
-MIT License
+AGPL 3.0
 
 ## Acknowledgements
 
