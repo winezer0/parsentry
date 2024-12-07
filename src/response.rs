@@ -31,27 +31,60 @@ pub struct Response {
 
 impl Response {
     pub fn print_readable(&self) {
-        println!("Analysis:");
-        println!("{}", "-".repeat(40));
-        println!("Scratchpad:\n{}", self.scratchpad);
-        println!("{}", "-".repeat(40));
-        println!("Analysis:\n{}", self.analysis);
-        println!("{}", "-".repeat(40));
-        println!("PoC:\n{}", self.poc);
-        println!("{}", "-".repeat(40));
-        println!("Confidence Score: {}", self.confidence_score);
-        println!("{}", "-".repeat(40));
-        println!("Vulnerability Types:");
-        for vuln_type in &self.vulnerability_types {
-            println!("  - {:?}", vuln_type);
+        println!("\n🔍 Analysis Report");
+        println!("{}", "=".repeat(80));
+
+        if !self.scratchpad.is_empty() {
+            println!("\n📝 Scratchpad:");
+            for line in self.scratchpad.lines() {
+                if !line.trim().is_empty() {
+                    println!("  {}", line.trim());
+                }
+            }
+            println!("{}", "-".repeat(80));
         }
-        println!("{}", "-".repeat(40));
-        println!("Context Code:");
-        for context in &self.context_code {
-            println!("  Name: {}", context.name);
-            println!("  Reason: {}", context.reason);
-            println!("  Code Line: {}", context.code_line);
-            println!();
+
+        if !self.analysis.is_empty() {
+            println!("\n🔎 Detailed Analysis:");
+            for line in self.analysis.lines() {
+                if !line.trim().is_empty() {
+                    println!("  {}", line.trim());
+                }
+            }
+            println!("{}", "-".repeat(80));
         }
+
+        if !self.poc.is_empty() {
+            println!("\n🧪 Proof of Concept:");
+            for line in self.poc.lines() {
+                if !line.trim().is_empty() {
+                    println!("  {}", line.trim());
+                }
+            }
+            println!("{}", "-".repeat(80));
+        }
+
+        println!("\n📊 Confidence Score: {}%", self.confidence_score);
+        println!("{}", "-".repeat(80));
+
+        if !self.vulnerability_types.is_empty() {
+            println!("\n⚠️  Vulnerability Types:");
+            for vuln_type in &self.vulnerability_types {
+                println!("  • {:?}", vuln_type);
+            }
+            println!("{}", "-".repeat(80));
+        }
+
+        if !self.context_code.is_empty() {
+            println!("\n💻 Context Code:");
+            for context in &self.context_code {
+                println!("\n  📌 {}", context.name);
+                println!("  🔍 Reason: {}", context.reason);
+                println!("  📄 Code: {}", context.code_line);
+            }
+            println!("{}", "-".repeat(80));
+        }
+
+        println!(); // Add final newline for better spacing
     }
 }

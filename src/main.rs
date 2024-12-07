@@ -116,51 +116,7 @@ async fn main() -> Result<()> {
         )
         .await?;
 
-        // Print vulnerability types
-        println!("\n🔒 Vulnerability Types:");
-        for vuln_type in &analysis_result.vulnerability_types {
-            println!("  • {:?}", vuln_type);
-        }
-
-        // Print confidence score
-        println!(
-            "\n📊 Confidence Score: {}%",
-            analysis_result.confidence_score
-        );
-        println!("{}", "-".repeat(80));
-
-        // Print analysis details
-        println!("\n📝 Details:");
-        for line in analysis_result.analysis.lines() {
-            let line = line.trim();
-            if !line.is_empty() {
-                println!("  {}", line);
-            }
-        }
-        println!("{}", "-".repeat(80));
-
-        // Print PoC if available
-        if !analysis_result.poc.is_empty() {
-            println!("\n🔬 Proof of Concept:");
-            for line in analysis_result.poc.lines() {
-                let line = line.trim();
-                if !line.is_empty() {
-                    println!("  {}", line);
-                }
-            }
-            println!("{}", "-".repeat(80));
-        }
-
-        // Print context code
-        if !analysis_result.context_code.is_empty() {
-            println!("\n💻 Relevant Code:");
-            for context in &analysis_result.context_code {
-                println!("  • {}", context.name);
-                println!("    Reason: {}", context.reason);
-                println!("    Line: {}\n", context.code_line);
-            }
-            println!("{}", "-".repeat(80));
-        }
+        analysis_result.print_readable();
 
         println!("\nPress Enter to continue...");
         let mut input = String::new();

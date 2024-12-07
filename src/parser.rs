@@ -16,7 +16,7 @@ pub struct Definition {
 
 impl CodeParser {
     pub fn new() -> Result<Self> {
-        let mut parser = Parser::new();
+        let parser = Parser::new();
         Ok(Self { parser })
     }
 
