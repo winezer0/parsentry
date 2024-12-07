@@ -34,13 +34,13 @@ The repository includes example vulnerable applications to demonstrate the tool'
 - `example/python-vulnerable-app`: A Python application with common vulnerabilities
 ```bash
 export ANTHROPIC_API_KEY=your-api-key
-./target/release/vulnhuntrs -r example/python-vulnerable-app
+cargo run -- -r example/python-vulnerable-app
 ```
 
 - `example/rust-vulnerable-app`: A Rust application with common vulnerabilities
 ```bash
 export OPENAI_API_KEY=your-api-key
-./target/release/vulnhuntrs -r example/rust-vulnerable-app -l gpt
+cargo run -- -r example/rust-vulnerable-app -l gpt
 ```
 
 These examples are for educational purposes only. Do not use them in production environments.

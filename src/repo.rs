@@ -1,68 +1,74 @@
 use anyhow::Result;
-use regex::Regex;
 use std::{
-    fs::{self, read_dir},
+    fs::{self, read_dir, File},
+    io::{self, BufRead, BufReader},
     path::{Path, PathBuf},
 };
 
+use crate::security_patterns::SecurityRiskPatterns;
+
+#[derive(Default)]
+pub struct LanguageExclusions {
+    pub file_patterns: Vec<String>,
+}
+
 pub struct RepoOps {
     repo_path: PathBuf,
-    to_exclude: Vec<String>,
-    file_names_to_exclude: Vec<String>,
-    compiled_patterns: Vec<Regex>,
+    gitignore_patterns: Vec<String>,
+    language_exclusions: LanguageExclusions,
+    security_patterns: Option<SecurityRiskPatterns>,
     supported_extensions: Vec<String>,
 }
 
 impl RepoOps {
     pub fn new(repo_path: PathBuf) -> Self {
-        let to_exclude = vec![
-            "/setup.py".to_string(),
-            "/test".to_string(),
-            "/example".to_string(),
-            "/docs".to_string(),
-            "/site-packages".to_string(),
-            ".venv".to_string(),
-            "virtualenv".to_string(),
-            "/dist".to_string(),
-        ];
+        let gitignore_patterns = Self::read_gitignore(&repo_path).unwrap_or_default();
 
-        let file_names_to_exclude = vec![
-            "test_".to_string(),
-            "conftest".to_string(),
-            "_test.py".to_string(),
-        ];
-
-        // Network-related patterns
-        let patterns = vec![
-            r"async\sdef\s\w+\(.*?request",
-            r"gr.Interface\(.*?\)",
-            r"@app\.route\(.*?\)",
-            // Add more patterns as needed
-        ];
-
-        let compiled_patterns = patterns
-            .into_iter()
-            .map(|p| Regex::new(p).unwrap())
-            .collect();
+        let language_exclusions = LanguageExclusions {
+            file_patterns: vec!["test_".to_string(), "conftest".to_string()],
+        };
 
         let supported_extensions = vec![
-            "py".to_string(),   // Python
-            "js".to_string(),   // JavaScript
-            "jsx".to_string(),  // React
-            "ts".to_string(),   // TypeScript
-            "tsx".to_string(),  // TypeScript React
-            "rs".to_string(),   // Rust
-            "go".to_string(),   // Go
-            "java".to_string(), // Java
+            "py".to_string(),
+            "js".to_string(),
+            "jsx".to_string(),
+            "ts".to_string(),
+            "tsx".to_string(),
+            "rs".to_string(),
+            "go".to_string(),
+            "java".to_string(),
         ];
+
+        let security_patterns = Some(SecurityRiskPatterns::new());
 
         Self {
             repo_path,
-            to_exclude,
-            file_names_to_exclude,
-            compiled_patterns,
+            gitignore_patterns,
+            language_exclusions,
+            security_patterns,
             supported_extensions,
         }
+    }
+
+    fn read_gitignore(repo_path: &Path) -> io::Result<Vec<String>> {
+        let gitignore_path = repo_path.join(".gitignore");
+        if !gitignore_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let file = File::open(gitignore_path)?;
+        let reader = BufReader::new(file);
+        let mut patterns = Vec::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                patterns.push(trimmed.to_string());
+            }
+        }
+
+        Ok(patterns)
     }
 
     fn visit_dirs(&self, dir: &Path, cb: &mut dyn FnMut(&Path)) -> std::io::Result<()> {
@@ -94,6 +100,46 @@ impl RepoOps {
         None
     }
 
+    fn should_exclude_path(&self, path: &Path) -> bool {
+        if let Ok(relative_path) = path.strip_prefix(&self.repo_path) {
+            let relative_str = relative_path.to_string_lossy();
+
+            // Check gitignore patterns
+            for pattern in &self.gitignore_patterns {
+                if Self::matches_gitignore_pattern(&relative_str, pattern) {
+                    return true;
+                }
+            }
+
+            // Check language-specific exclusions
+            if let Some(file_name) = path.file_name() {
+                let file_name = file_name.to_string_lossy().to_lowercase();
+                if self
+                    .language_exclusions
+                    .file_patterns
+                    .iter()
+                    .any(|pattern| file_name.contains(pattern))
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn matches_gitignore_pattern(path: &str, pattern: &str) -> bool {
+        let pattern = pattern.trim_start_matches('/');
+        let path = path.trim_start_matches('/');
+
+        if pattern.starts_with('*') {
+            path.ends_with(&pattern[1..])
+        } else if pattern.ends_with('*') {
+            path.starts_with(&pattern[..pattern.len() - 1])
+        } else {
+            path == pattern || path.starts_with(&format!("{}/", pattern))
+        }
+    }
+
     pub fn get_relevant_files(&self) -> Vec<PathBuf> {
         let mut files = Vec::new();
 
@@ -104,25 +150,8 @@ impl RepoOps {
                     return;
                 }
 
-                let path_str = path.to_string_lossy().to_lowercase();
-
-                if self
-                    .to_exclude
-                    .iter()
-                    .any(|exclude| path_str.contains(exclude))
-                {
+                if self.should_exclude_path(path) {
                     return;
-                }
-
-                if let Some(file_name) = path.file_name() {
-                    let file_name = file_name.to_string_lossy().to_lowercase();
-                    if self
-                        .file_names_to_exclude
-                        .iter()
-                        .any(|exclude| file_name.contains(exclude))
-                    {
-                        return;
-                    }
                 }
 
                 files.push(path.to_path_buf());
@@ -137,15 +166,14 @@ impl RepoOps {
     }
 
     pub fn get_network_related_files(&self, files: &[PathBuf]) -> Vec<PathBuf> {
-        let mut network_files = Vec::new();
+        let Some(security_patterns) = &self.security_patterns else {
+            return Vec::new();
+        };
 
+        let mut network_files = Vec::new();
         for file_path in files {
             if let Ok(content) = fs::read_to_string(file_path) {
-                if self
-                    .compiled_patterns
-                    .iter()
-                    .any(|pattern| pattern.is_match(&content))
-                {
+                if security_patterns.matches(&content) {
                     network_files.push(file_path.clone());
                 }
             }

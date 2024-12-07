@@ -4,6 +4,7 @@ mod parser;
 mod prompts;
 mod repo;
 mod response;
+mod security_patterns;
 mod symbol_finder;
 
 use anyhow::Result;
@@ -69,11 +70,12 @@ async fn main() -> Result<()> {
 
     println!("\n🔍 Vulnhuntrs - Security Analysis Tool\n");
 
-    // Get repo files that don't include tests and documentation
+    // Get repo files excluding tests and documentation
     let files = repo.get_relevant_files();
     println!("📁 Found relevant source files");
 
     // Get files to analyze based on command line args
+    // If no specific path is provided, analyze files with potential security risks
     let files_to_analyze = if let Some(analyze_path) = args.analyze {
         repo.get_files_to_analyze(Some(analyze_path))?
     } else {
