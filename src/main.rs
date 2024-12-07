@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
     let repo = RepoOps::new(args.root.clone());
     let mut code_extractor = SymbolExtractor::new(&args.root);
 
-    println!("\n🔍 VulnHuntr - Security Analysis Tool\n");
+    println!("\n🔍 Vulnhuntrs - Security Analysis Tool\n");
 
     // Get repo files that don't include tests and documentation
     let files = repo.get_relevant_files();
