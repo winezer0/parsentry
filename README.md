@@ -1,4 +1,12 @@
-# Vulnhuntrs
+<div align="center">
+
+  <img width="250" src="./logo.png" alt="Vulnhuntrs Logo">
+
+A tool to identify remotely exploitable vulnerabilities using LLMs and static code analysis.
+
+**Autonomous AI-discovered 0day vulnerabilities**
+
+</div>
 
 Vulnhuntrs is a security analysis tool designed to detect vulnerabilities in applications. It provides static analysis capabilities to identify potential security issues in your codebase.
 
@@ -57,3 +65,7 @@ This tool is intended for security research and educational purposes only. Do no
 ## License
 
 MIT License
+
+## Acknowledgements
+
+This project was inspired by the [protectai/vulnhunter](https://github.com/protectai/vulnhuntr).
