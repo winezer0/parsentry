@@ -29,12 +29,12 @@ impl CodeParser {
 
         // Initialize supported languages with their queries
         let languages = vec![
-            unsafe { (tree_sitter_python(), "python", "(function_definition name: (identifier) @name) (class_definition name: (identifier) @name)") },
-            unsafe { (tree_sitter_javascript(), "javascript", "(function_declaration name: (identifier) @name) (class_declaration name: (identifier) @name)") },
-            unsafe { (tree_sitter_typescript(), "typescript", "(function_declaration name: (identifier) @name) (class_declaration name: (identifier) @name)") },
-            unsafe { (tree_sitter_rust(), "rust", "(function_item name: (identifier) @name) (struct_item name: (type_identifier) @name)") },
-            unsafe { (tree_sitter_go(), "go", "(function_declaration name: (identifier) @name) (type_declaration (type_spec name: (type_identifier) @name))") },
-            unsafe { (tree_sitter_java(), "java", "(method_declaration name: (identifier) @name) (class_declaration name: (identifier) @name)") },
+            unsafe { (tree_sitter_python(), "python", "(function_definition) @def (class_definition) @def") },
+            unsafe { (tree_sitter_javascript(), "javascript", "(function_declaration) @def (class_declaration) @def") },
+            unsafe { (tree_sitter_typescript(), "typescript", "(function_declaration) @def (class_declaration) @def") },
+            unsafe { (tree_sitter_rust(), "rust", "(function_item) @def (struct_item) @def") },
+            unsafe { (tree_sitter_go(), "go", "(function_declaration) @def (type_declaration) @def") },
+            unsafe { (tree_sitter_java(), "java", "(method_declaration) @def (class_declaration) @def") },
         ];
 
         Ok(Self { parser, languages })
@@ -67,11 +67,17 @@ impl CodeParser {
         let mut definitions = Vec::new();
         for match_ in matches {
             for capture in match_.captures {
-                let name = capture.node.utf8_text(content.as_bytes())?.to_string();
+                // Find the name node within the definition
+                let def_node = capture.node;
+                let name_node = def_node
+                    .child_by_field_name("name")
+                    .ok_or_else(|| anyhow::anyhow!("Failed to find name node"))?;
+                
+                let name = name_node.utf8_text(content.as_bytes())?.to_string();
                 definitions.push(Definition {
                     name,
-                    start_byte: capture.node.start_byte(),
-                    end_byte: capture.node.end_byte(),
+                    start_byte: def_node.start_byte(),
+                    end_byte: def_node.end_byte(),
                 });
             }
         }
