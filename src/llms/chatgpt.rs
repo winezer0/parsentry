@@ -3,13 +3,13 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use super::{trait_def::LLM, ChatMessage};
+use super::{LLM, ChatMessage};
 
 pub struct ChatGPT {
-    model: String,
-    base_url: String,
-    client: Client,
-    system_prompt: String,
+    pub model: String,
+    pub base_url: String,
+    pub client: Client,
+    pub system_prompt: String,
 }
 
 impl ChatGPT {
