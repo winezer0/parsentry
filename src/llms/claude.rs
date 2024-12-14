@@ -92,3 +92,55 @@ impl LLM for Claude {
         Ok(response.content[0].text.clone())
     }
 }
+
+#[cfg(feature = "integration-tests")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+				use tokio;
+
+				const TEST_MODEL: &str = "claude-3-opus-20240229";
+				const TEST_SYSTEM_PROMPT: &str = "You are a helpful AI assistant.";
+				const BASE_URL: &str = "https://api.anthropic.com/v1/messages";
+
+				fn setup_claude() -> Claude {
+								Claude::new(
+												TEST_MODEL.to_string(),
+												BASE_URL.to_string(),
+												TEST_SYSTEM_PROMPT.to_string(),
+								)
+				}
+
+				#[tokio::test]
+				async fn test_chat_success() {
+								let claude = setup_claude();
+								let prompt = "What is 2+2?";
+								
+								let result = claude.chat(prompt).await;
+								assert!(result.is_ok(), "Chat should succeed with valid API key");
+								
+								let response = result.unwrap();
+								assert!(!response.is_empty(), "Response should not be empty");
+				}
+
+				#[tokio::test]
+				async fn test_chat_invalid_api_key() {
+								// Temporarily set invalid API key
+								env::set_var("ANTHROPIC_API_KEY", "invalid_key");
+								
+								let claude = setup_claude();
+								let prompt = "What is 2+2?";
+								
+								let result = claude.chat(prompt).await;
+								assert!(result.is_err(), "Chat should fail with invalid API key");
+				}
+
+				#[test]
+				fn test_claude_initialization() {
+								let claude = setup_claude();
+								assert_eq!(claude.model, TEST_MODEL);
+								assert_eq!(claude.base_url, BASE_URL);
+								assert_eq!(claude.system_prompt, TEST_SYSTEM_PROMPT);
+				}
+}

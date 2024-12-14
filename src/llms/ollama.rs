@@ -56,3 +56,10 @@ impl LLM for Ollama {
         Ok(response.response)
     }
 }
+
+#[cfg(feature = "integration-tests")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+}

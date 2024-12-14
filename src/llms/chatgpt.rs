@@ -86,3 +86,10 @@ impl LLM for ChatGPT {
         Ok(response.choices[0].message.content.clone())
     }
 }
+
+#[cfg(feature = "integration-tests")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+}
