@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use log::info;
 use std::path::PathBuf;
 
-use crate::llm::LLM;
+use crate::llms::LLM;
 use crate::prompts::{self, vuln_specific};
 use crate::response::Response;
 use crate::symbol_finder::{CodeDefinition, SymbolExtractor};

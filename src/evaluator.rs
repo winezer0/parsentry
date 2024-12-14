@@ -1,5 +1,5 @@
 use crate::response::{Response, VulnType};
-use crate::llm::LLM;
+use crate::llms::LLM;
 use crate::prompts::EVALUATOR_PROMPT_TEMPLATE;
 use anyhow::{Error, Result};
 use serde::Deserialize;
@@ -65,6 +65,47 @@ struct LLMEvaluation {
 }
 
 pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) -> Result<EvaluationResult, Error> {
+    // Evaluate analysis and PoC quality
+    let mut detailed_feedback = String::new();
+    
+    // Analysis quality checks
+    if response.analysis.contains("impact") || response.analysis.contains("Impact") {
+        detailed_feedback.push_str("✓ Analysis includes impact assessment\n");
+    } else {
+        detailed_feedback.push_str("✗ Analysis should include impact assessment\n");
+    }
+
+    if response.analysis.contains("mitigat") {
+        detailed_feedback.push_str("✓ Analysis includes mitigation suggestions\n");
+    } else {
+        detailed_feedback.push_str("✗ Analysis should include mitigation suggestions\n");
+    }
+
+    if response.analysis.contains("root cause") || response.analysis.contains("caused by") {
+        detailed_feedback.push_str("✓ Analysis includes root cause explanation\n");
+    } else {
+        detailed_feedback.push_str("✗ Analysis should include root cause explanation\n");
+    }
+
+    // PoC quality checks
+    if response.poc.contains("curl") || response.poc.contains("http") {
+        detailed_feedback.push_str("✓ PoC includes concrete example request\n");
+    } else {
+        detailed_feedback.push_str("✗ PoC should include concrete example request\n");
+    }
+
+    if response.poc.contains("Expected result") || response.poc.contains("expected output") {
+        detailed_feedback.push_str("✓ PoC includes expected results\n");
+    } else {
+        detailed_feedback.push_str("✗ PoC should include expected results\n");
+    }
+
+    if response.poc.contains("Steps") || response.poc.contains("1.") {
+        detailed_feedback.push_str("✓ PoC includes step-by-step instructions\n");
+    } else {
+        detailed_feedback.push_str("✗ PoC should include step-by-step instructions\n");
+    }
+
     // Format the report for evaluation
     let report = format!(
         "Identified Vulnerabilities: {:?}\n\nAnalysis:\n{}\n\nProof of Concept:\n{}",
@@ -79,6 +120,9 @@ pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) 
     
     // Parse LLM response as JSON
     let eval: LLMEvaluation = serde_json::from_str(&eval_response)?;
+
+    // Combine LLM feedback with detailed quality checks
+    let combined_feedback = format!("{}\n\nDetailed Quality Assessment:\n{}", eval.feedback, detailed_feedback);
     
     // Convert string vulnerability types to VulnType enum
     let correct_vulns = eval.correct_vulns.iter()
@@ -110,61 +154,11 @@ pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) 
 
     Ok(EvaluationResult {
         score: eval.score,
-        feedback: eval.feedback,
+        feedback: combined_feedback,
         correct_vulns_found: correct_vulns,
         missed_vulns,
         false_positives,
     })
-}
-
-fn evaluate_analysis_quality(response: &Response) -> String {
-    let mut feedback = String::new();
-    
-    // Check if analysis includes key elements
-    if response.analysis.contains("impact") || response.analysis.contains("Impact") {
-        feedback.push_str("✓ Analysis includes impact assessment\n");
-    } else {
-        feedback.push_str("✗ Analysis should include impact assessment\n");
-    }
-
-    if response.analysis.contains("mitigat") {
-        feedback.push_str("✓ Analysis includes mitigation suggestions\n");
-    } else {
-        feedback.push_str("✗ Analysis should include mitigation suggestions\n");
-    }
-
-    if response.analysis.contains("root cause") || response.analysis.contains("caused by") {
-        feedback.push_str("✓ Analysis includes root cause explanation\n");
-    } else {
-        feedback.push_str("✗ Analysis should include root cause explanation\n");
-    }
-
-    feedback
-}
-
-fn evaluate_poc_quality(response: &Response) -> String {
-    let mut feedback = String::new();
-    
-    // Check if PoC includes key elements
-    if response.poc.contains("curl") || response.poc.contains("http") {
-        feedback.push_str("✓ PoC includes concrete example request\n");
-    } else {
-        feedback.push_str("✗ PoC should include concrete example request\n");
-    }
-
-    if response.poc.contains("Expected result") || response.poc.contains("expected output") {
-        feedback.push_str("✓ PoC includes expected results\n");
-    } else {
-        feedback.push_str("✗ PoC should include expected results\n");
-    }
-
-    if response.poc.contains("Steps") || response.poc.contains("1.") {
-        feedback.push_str("✓ PoC includes step-by-step instructions\n");
-    } else {
-        feedback.push_str("✗ PoC should include step-by-step instructions\n");
-    }
-
-    feedback
 }
 
 #[cfg(test)]

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::path::{Path, PathBuf};
 
 use crate::parser::{CodeParser, Definition};
@@ -11,14 +10,12 @@ pub struct CodeDefinition {
 }
 
 pub struct SymbolExtractor {
-    root_path: PathBuf,
     parser: CodeParser,
 }
 
 impl SymbolExtractor {
-    pub fn new<P: AsRef<Path>>(root_path: P) -> Self {
+    pub fn new<P: AsRef<Path>>(_root_path: P) -> Self {
         Self {
-            root_path: root_path.as_ref().to_path_buf(),
             parser: CodeParser::new().expect("Failed to initialize parser"),
         }
     }
@@ -101,7 +98,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_extract_function_definition() -> Result<()> {
+    fn test_extract_function_definition() -> Result<(), std::io::Error> {
         let temp_dir = tempdir()?;
         let file_path = temp_dir.path().join("test.py");
 
@@ -131,7 +128,7 @@ class TestClass:
     }
 
     #[test]
-    fn test_extract_class_definition() -> Result<()> {
+    fn test_extract_class_definition() -> Result<(), std::io::Error> {
         let temp_dir = tempdir()?;
         let file_path = temp_dir.path().join("test.py");
 

@@ -1,13 +1,3 @@
-mod analyzer;
-mod evaluator;
-mod llm;
-mod parser;
-mod prompts;
-mod repo;
-mod response;
-mod security_patterns;
-mod symbol_finder;
-
 use anyhow::Result;
 use clap::Parser;
 use log::{info, warn};
@@ -18,12 +8,12 @@ use std::{
     path::PathBuf,
 };
 
-use analyzer::analyze_file;
-use evaluator::evaluate_python_vulnerable_app;
-use llm::initialize_llm;
-use prompts::{README_SUMMARY_PROMPT_TEMPLATE, SYS_PROMPT_TEMPLATE};
-use repo::RepoOps;
-use symbol_finder::SymbolExtractor;
+use vulnhuntrs::analyzer::analyze_file;
+use vulnhuntrs::evaluator::evaluate_python_vulnerable_app;
+use vulnhuntrs::llms::initialize_llm;
+use vulnhuntrs::prompts::{README_SUMMARY_PROMPT_TEMPLATE, SYS_PROMPT_TEMPLATE};
+use vulnhuntrs::repo::RepoOps;
+use vulnhuntrs::symbol_finder::SymbolExtractor;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -125,14 +115,12 @@ async fn main() -> Result<()> {
         analysis_result.print_readable();
 
         // If evaluation mode is enabled and we're analyzing an example vulnerable app
-        if args.evaluate {
-            if file_name.contains("python-vulnerable-app") {
-                println!("\n📊 Evaluating Analysis Report...\n");
-                println!("{}", "=".repeat(80));
-                
-                let eval_result = evaluate_python_vulnerable_app(&analysis_result, llm.as_ref()).await?;
-                eval_result.print_readable();
-            }
+        if args.evaluate && file_name.contains("python-vulnerable-app") {
+            println!("\n📊 Evaluating Analysis Report...\n");
+            println!("{}", "=".repeat(80));
+            
+            let eval_result = evaluate_python_vulnerable_app(&analysis_result, llm.as_ref()).await?;
+            eval_result.print_readable();
         }
 
         println!("\nPress Enter to continue...");
