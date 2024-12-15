@@ -1,6 +1,7 @@
-use actix_web::{get, web, App, HttpResponse, HttpServer, Result};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use rusqlite::{Connection, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::process::Command;
 
 // Vulnerable database initialization
@@ -33,8 +34,11 @@ struct User {
 
 // Vulnerability 1: SQL Injection
 #[get("/sqli")]
-async fn sql_injection(query: web::Query<HashMap<String, String>>) -> Result<HttpResponse> {
-    let username = query.get("username").unwrap_or(&String::from(""));
+async fn sql_injection(query: web::Query<HashMap<String, String>>) -> impl Responder {
+    let username = query
+        .get("username")
+        .cloned()
+        .unwrap_or_else(|| String::from(""));
 
     // Vulnerable SQL query - DO NOT USE IN PRODUCTION
     let query_str = format!("SELECT * FROM users WHERE username = '{}'", username);
@@ -54,13 +58,16 @@ async fn sql_injection(query: web::Query<HashMap<String, String>>) -> Result<Htt
         .filter_map(|u| u.ok())
         .collect();
 
-    Ok(HttpResponse::Ok().json(users))
+    HttpResponse::Ok().json(users)
 }
 
 // Vulnerability 2: Command Injection
 #[get("/cmdi")]
-async fn command_injection(query: web::Query<HashMap<String, String>>) -> Result<HttpResponse> {
-    let hostname = query.get("hostname").unwrap_or(&String::from("localhost"));
+async fn command_injection(query: web::Query<HashMap<String, String>>) -> impl Responder {
+    let hostname = query
+        .get("hostname")
+        .cloned()
+        .unwrap_or_else(|| String::from("localhost"));
 
     // Vulnerable command execution - DO NOT USE IN PRODUCTION
     let output = Command::new("sh")
@@ -71,18 +78,21 @@ async fn command_injection(query: web::Query<HashMap<String, String>>) -> Result
 
     let result = String::from_utf8_lossy(&output.stdout);
 
-    Ok(HttpResponse::Ok().body(result.to_string()))
+    HttpResponse::Ok().body(result.to_string())
 }
 
 // Vulnerability 3: Path Traversal
 #[get("/file")]
-async fn file_read(query: web::Query<HashMap<String, String>>) -> Result<HttpResponse> {
-    let filename = query.get("name").unwrap_or(&String::from("default.txt"));
+async fn file_read(query: web::Query<HashMap<String, String>>) -> impl Responder {
+    let filename = query
+        .get("name")
+        .cloned()
+        .unwrap_or_else(|| String::from("default.txt"));
 
     // Vulnerable file read - DO NOT USE IN PRODUCTION
-    match std::fs::read_to_string(filename) {
-        Ok(content) => Ok(HttpResponse::Ok().body(content)),
-        Err(e) => Ok(HttpResponse::InternalServerError().body(e.to_string())),
+    match std::fs::read_to_string(&filename) {
+        Ok(content) => HttpResponse::Ok().body(content),
+        Err(e) => HttpResponse::InternalServerError().body(e.to_string()),
     }
 }
 
