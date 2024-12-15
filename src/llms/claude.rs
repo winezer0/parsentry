@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
-use super::LLM;
+use super::{ChatMessage, LLM};
 
 pub struct Claude {
     pub model: String,
@@ -25,56 +25,89 @@ impl Claude {
 
 #[async_trait]
 impl LLM for Claude {
-    async fn chat(&self, prompt: &str) -> Result<String> {
+    async fn chat(&self, messages: &[ChatMessage]) -> Result<String> {
         #[derive(Serialize)]
         struct Request {
             model: String,
+            max_tokens: u32,
             messages: Vec<Message>,
         }
 
         #[derive(Serialize)]
         struct Message {
             role: String,
-            content: Vec<Content>,
+            content: String,
         }
 
-        #[derive(Serialize)]
-        struct Content {
-            #[serde(rename = "type")]
-            content_type: String,
-            text: String,
-        }
-
-        #[derive(Deserialize)]
+        #[derive(Deserialize, Debug)]
         struct Response {
-            content: Vec<MessageContent>,
+            content: Vec<Content>,
+            #[serde(default)]
+            role: String,
+            #[serde(default)]
+            model: String,
+            #[serde(default)]
+            stop_reason: Option<String>,
+            #[serde(default)]
+            stop_sequence: Option<String>,
+            #[serde(default)]
+            usage: Usage,
         }
 
-        #[derive(Deserialize)]
-        struct MessageContent {
+        #[derive(Deserialize, Debug, Default)]
+        struct Content {
+            #[serde(rename = "type", default)]
+            content_type: String,
+            #[serde(default)]
             text: String,
         }
 
-        let messages = vec![
-            Message {
-                role: "system".to_string(),
-                content: vec![Content {
-                    content_type: "text".to_string(),
-                    text: self.system_prompt.clone(),
-                }],
-            },
-            Message {
-                role: "user".to_string(),
-                content: vec![Content {
-                    content_type: "text".to_string(),
-                    text: prompt.to_string(),
-                }],
-            },
-        ];
+        #[derive(Deserialize, Debug, Default)]
+        struct Usage {
+            #[serde(default)]
+            input_tokens: u32,
+            #[serde(default)]
+            output_tokens: u32,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct ErrorResponse {
+            error: ErrorDetail,
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct ErrorDetail {
+            message: String,
+            #[serde(rename = "type")]
+            error_type: String,
+        }
+
+        let filtered_messages: Vec<Message> = messages
+            .iter()
+            .filter(|msg| !msg.content.trim().is_empty())
+            .map(|msg| Message {
+                role: msg.role.clone(),
+                content: msg.content.clone(),
+            })
+            .collect();
+
+        if filtered_messages.is_empty() {
+            return Err(anyhow::anyhow!("No valid messages provided"));
+        }
+
+        // role: "system" is deprecated, use "assistant" instead
+        let system_message = Message {
+            role: "assistant".to_string(),
+            content: self.system_prompt.clone(),
+        };
+
+        let mut all_messages = vec![system_message];
+        all_messages.extend(filtered_messages);
 
         let request = Request {
             model: self.model.clone(),
-            messages,
+            max_tokens: 1024,
+            messages: all_messages,
         };
 
         let response = self
@@ -83,13 +116,45 @@ impl LLM for Claude {
             .header("Content-Type", "application/json")
             .header("x-api-key", std::env::var("ANTHROPIC_API_KEY")?)
             .header("anthropic-version", "2023-06-01")
+            .header("accept", "application/json")
             .json(&request)
             .send()
-            .await?
-            .json::<Response>()
             .await?;
 
-        Ok(response.content[0].text.clone())
+        let response_text = response.text().await?;
+        log::debug!("Raw API response: {}", response_text);
+
+        // First, check for API error response
+        if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&response_text) {
+            return Err(anyhow::anyhow!(
+                "API Error: {} ({})",
+                error_response.error.message,
+                error_response.error.error_type
+            ));
+        }
+
+        // Then try parsing the successful response
+        match serde_json::from_str::<Response>(&response_text) {
+            Ok(response) => {
+                if response.content.is_empty() {
+                    log::error!("Empty response content: {}", response_text);
+                    return Err(anyhow::anyhow!("Empty response content"));
+                }
+                Ok(response.content[0].text.clone())
+            }
+            Err(parse_error) => {
+                log::error!(
+                    "JSON Parsing error: {} | Raw response: {}",
+                    parse_error,
+                    response_text
+                );
+                Err(anyhow::anyhow!(
+                    "Parsing error: {} | Raw response: {}",
+                    parse_error,
+                    response_text
+                ))
+            }
+        }
     }
 }
 
@@ -97,50 +162,73 @@ impl LLM for Claude {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dotenv::dotenv;
     use std::env;
-				use tokio;
+    use tokio;
 
-				const TEST_MODEL: &str = "claude-3-opus-20240229";
-				const TEST_SYSTEM_PROMPT: &str = "You are a helpful AI assistant.";
-				const BASE_URL: &str = "https://api.anthropic.com/v1/messages";
+    const TEST_MODEL: &str = "claude-3-5-sonnet-20241022";
+    const TEST_SYSTEM_PROMPT: &str = "You are a helpful AI assistant.";
+    const BASE_URL: &str = "https://api.anthropic.com/v1/messages";
 
-				fn setup_claude() -> Claude {
-								Claude::new(
-												TEST_MODEL.to_string(),
-												BASE_URL.to_string(),
-												TEST_SYSTEM_PROMPT.to_string(),
-								)
-				}
+    fn setup_claude() -> Claude {
+        dotenv().ok();
+        Claude::new(
+            TEST_MODEL.to_string(),
+            BASE_URL.to_string(),
+            TEST_SYSTEM_PROMPT.to_string(),
+        )
+    }
 
-				#[tokio::test]
-				async fn test_chat_success() {
-								let claude = setup_claude();
-								let prompt = "What is 2+2?";
-								
-								let result = claude.chat(prompt).await;
-								assert!(result.is_ok(), "Chat should succeed with valid API key");
-								
-								let response = result.unwrap();
-								assert!(!response.is_empty(), "Response should not be empty");
-				}
+    #[tokio::test]
+    async fn test_chat_success() {
+        let claude = setup_claude();
+        let messages = vec![ChatMessage {
+            role: "user".to_string(),
+            content: "What is 2+2?".to_string(),
+        }];
 
-				#[tokio::test]
-				async fn test_chat_invalid_api_key() {
-								// Temporarily set invalid API key
-								env::set_var("ANTHROPIC_API_KEY", "invalid_key");
-								
-								let claude = setup_claude();
-								let prompt = "What is 2+2?";
-								
-								let result = claude.chat(prompt).await;
-								assert!(result.is_err(), "Chat should fail with invalid API key");
-				}
+        let result = claude.chat(&messages).await;
+        assert!(result.is_ok(), "Chat should succeed with valid API key");
 
-				#[test]
-				fn test_claude_initialization() {
-								let claude = setup_claude();
-								assert_eq!(claude.model, TEST_MODEL);
-								assert_eq!(claude.base_url, BASE_URL);
-								assert_eq!(claude.system_prompt, TEST_SYSTEM_PROMPT);
-				}
+        let response = result.unwrap();
+        assert!(!response.is_empty(), "Response should not be empty");
+    }
+
+    #[tokio::test]
+    async fn test_chat_invalid_api_key() {
+        env::set_var("ANTHROPIC_API_KEY", "invalid_key");
+
+        let claude = setup_claude();
+        let messages = vec![ChatMessage {
+            role: "user".to_string(),
+            content: "What is 2+2?".to_string(),
+        }];
+
+        let result = claude.chat(&messages).await;
+        assert!(result.is_err(), "Chat should fail with invalid API key");
+    }
+
+    #[test]
+    fn test_claude_initialization() {
+        let claude = setup_claude();
+        assert_eq!(claude.model, TEST_MODEL);
+        assert_eq!(claude.base_url, BASE_URL);
+        assert_eq!(claude.system_prompt, TEST_SYSTEM_PROMPT);
+    }
+
+    #[tokio::test]
+    async fn test_chat_empty_message() {
+        let claude = setup_claude();
+        let messages = vec![ChatMessage {
+            role: "user".to_string(),
+            content: "".to_string(),
+        }];
+
+        let result = claude.chat(&messages).await;
+        assert!(result.is_err(), "Chat should fail with empty message");
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No valid messages provided"));
+    }
 }

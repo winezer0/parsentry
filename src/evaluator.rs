@@ -1,6 +1,6 @@
-use crate::response::{Response, VulnType};
-use crate::llms::LLM;
+use crate::llms::{ChatMessage, LLM};
 use crate::prompts::EVALUATOR_PROMPT_TEMPLATE;
+use crate::response::{Response, VulnType};
 use anyhow::{Error, Result};
 use serde::Deserialize;
 
@@ -64,10 +64,13 @@ struct LLMEvaluation {
     feedback: String,
 }
 
-pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) -> Result<EvaluationResult, Error> {
+pub async fn evaluate_python_vulnerable_app(
+    response: &Response,
+    llm: &dyn LLM,
+) -> Result<EvaluationResult, Error> {
     // Evaluate analysis and PoC quality
     let mut detailed_feedback = String::new();
-    
+
     // Analysis quality checks
     if response.analysis.contains("impact") || response.analysis.contains("Impact") {
         detailed_feedback.push_str("✓ Analysis includes impact assessment\n");
@@ -109,23 +112,30 @@ pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) 
     // Format the report for evaluation
     let report = format!(
         "Identified Vulnerabilities: {:?}\n\nAnalysis:\n{}\n\nProof of Concept:\n{}",
-        response.vulnerability_types,
-        response.analysis,
-        response.poc
+        response.vulnerability_types, response.analysis, response.poc
     );
 
     // Get LLM evaluation
     let prompt = EVALUATOR_PROMPT_TEMPLATE.replace("{report}", &report);
-    let eval_response = llm.chat(&prompt).await?;
-    
+    let messages = vec![ChatMessage {
+        role: "user".to_string(),
+        content: prompt,
+    }];
+    let eval_response = llm.chat(&messages).await?;
+
     // Parse LLM response as JSON
     let eval: LLMEvaluation = serde_json::from_str(&eval_response)?;
 
     // Combine LLM feedback with detailed quality checks
-    let combined_feedback = format!("{}\n\nDetailed Quality Assessment:\n{}", eval.feedback, detailed_feedback);
-    
+    let combined_feedback = format!(
+        "{}\n\nDetailed Quality Assessment:\n{}",
+        eval.feedback, detailed_feedback
+    );
+
     // Convert string vulnerability types to VulnType enum
-    let correct_vulns = eval.correct_vulns.iter()
+    let correct_vulns = eval
+        .correct_vulns
+        .iter()
         .map(|v| match v.as_str() {
             "SQLI" => VulnType::SQLI,
             "XSS" => VulnType::XSS,
@@ -134,7 +144,9 @@ pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) 
         })
         .collect();
 
-    let missed_vulns = eval.missed_vulns.iter()
+    let missed_vulns = eval
+        .missed_vulns
+        .iter()
         .map(|v| match v.as_str() {
             "SQLI" => VulnType::SQLI,
             "XSS" => VulnType::XSS,
@@ -143,7 +155,9 @@ pub async fn evaluate_python_vulnerable_app(response: &Response, llm: &dyn LLM) 
         })
         .collect();
 
-    let false_positives = eval.false_positives.iter()
+    let false_positives = eval
+        .false_positives
+        .iter()
         .map(|v| match v.as_str() {
             "SQLI" => VulnType::SQLI,
             "XSS" => VulnType::XSS,
@@ -171,14 +185,15 @@ mod tests {
 
     #[async_trait]
     impl LLM for MockLLM {
-        async fn chat(&self, _prompt: &str) -> Result<String> {
+        async fn chat(&self, _messages: &[ChatMessage]) -> Result<String> {
             Ok(r#"{
                 "score": 85.0,
                 "correct_vulns": ["SQLI", "XSS"],
                 "missed_vulns": ["RCE"],
                 "false_positives": ["SSRF"],
                 "feedback": "Good analysis but missed some vulnerabilities"
-            }"#.to_string())
+            }"#
+            .to_string())
         }
     }
 
@@ -198,8 +213,10 @@ mod tests {
         };
 
         let llm = MockLLM;
-        let result = evaluate_python_vulnerable_app(&response, &llm).await.unwrap();
-        
+        let result = evaluate_python_vulnerable_app(&response, &llm)
+            .await
+            .unwrap();
+
         assert_eq!(result.score, 85.0);
         assert_eq!(result.correct_vulns_found.len(), 2);
         assert_eq!(result.missed_vulns.len(), 1);

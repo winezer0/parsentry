@@ -1,12 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
+use dotenv::dotenv;
 use log::{info, warn};
-use std::{
-    env,
-    fs::File,
-    io::{BufRead, BufReader},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use vulnhuntrs::analyzer::analyze_file;
 use vulnhuntrs::evaluator::evaluate_python_vulnerable_app;
@@ -39,26 +35,10 @@ struct Args {
     evaluate: bool,
 }
 
-fn load_env_file() -> Result<()> {
-    if let Ok(file) = File::open(".env") {
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            let line = line?;
-            if line.starts_with('#') || line.is_empty() {
-                continue;
-            }
-            if let Some((key, value)) = line.split_once('=') {
-                env::set_var(key.trim(), value.trim());
-            }
-        }
-    }
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    load_env_file()?;
+    dotenv().ok();
 
     let args = Args::parse();
     let repo = RepoOps::new(args.root.clone());
@@ -83,14 +63,19 @@ async fn main() -> Result<()> {
     if let Some(readme_content) = repo.get_readme_content() {
         println!("📖 Analyzing project README...");
         info!("Summarizing project README");
-        let llm = initialize_llm(&args.llm, "")?;
-        let summary = llm
-            .chat(&format!(
-                "{}\n{}",
-                readme_content, README_SUMMARY_PROMPT_TEMPLATE
-            ))
-            .await?;
+        log::debug!("README content length: {} characters", readme_content.len());
+        let llm = initialize_llm(&args.llm, SYS_PROMPT_TEMPLATE)?;
+        let messages = vec![vulnhuntrs::llms::ChatMessage {
+            role: "user".to_string(),
+            content: format!("{}\n{}", readme_content, README_SUMMARY_PROMPT_TEMPLATE),
+        }];
+        log::debug!(
+            "Sending README summary request with {} characters",
+            messages[0].content.len()
+        );
+        let summary = llm.chat(&messages[..]).await?;
         info!("README summary complete");
+        log::debug!("Received README summary of {} characters", summary.len());
         system_prompt = format!("{}\n\nProject Context:\n{}", system_prompt, summary);
     } else {
         warn!("No README summary found");
@@ -118,8 +103,9 @@ async fn main() -> Result<()> {
         if args.evaluate && file_name.contains("python-vulnerable-app") {
             println!("\n📊 Evaluating Analysis Report...\n");
             println!("{}", "=".repeat(80));
-            
-            let eval_result = evaluate_python_vulnerable_app(&analysis_result, llm.as_ref()).await?;
+
+            let eval_result =
+                evaluate_python_vulnerable_app(&analysis_result, llm.as_ref()).await?;
             eval_result.print_readable();
         }
 

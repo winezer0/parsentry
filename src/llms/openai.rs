@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 
 use super::{ChatMessage, LLM};
 
-pub struct Ollama {
+pub struct OpenAI {
     pub model: String,
     pub base_url: String,
     pub client: Client,
     pub system_prompt: String,
 }
 
-impl Ollama {
+impl OpenAI {
     pub fn new(model: String, base_url: String, system_prompt: String) -> Self {
         Self {
             model,
@@ -24,34 +24,43 @@ impl Ollama {
 }
 
 #[async_trait]
-impl LLM for Ollama {
-    async fn chat(&self, messages: &[ChatMessage]) -> Result<String> {
+impl LLM for OpenAI {
+    async fn chat(&self, prompt: &[ChatMessage]) -> Result<String> {
         #[derive(Serialize)]
         struct Request {
             model: String,
-            prompt: String,
-            system: String,
+            messages: Vec<ChatMessage>,
         }
 
         #[derive(Deserialize)]
         struct Response {
-            response: String,
+            choices: Vec<Choice>,
         }
 
-        let prompt = messages
-            .iter()
-            .map(|m| m.content.as_str())
-            .collect::<Vec<_>>()
-            .join("\n");
+        #[derive(Deserialize)]
+        struct Choice {
+            message: ChatMessage,
+        }
+
+        let mut messages = vec![ChatMessage {
+            role: "system".to_string(),
+            content: self.system_prompt.clone(),
+        }];
+        messages.extend_from_slice(prompt);
+
         let request = Request {
             model: self.model.clone(),
-            prompt,
-            system: self.system_prompt.clone(),
+            messages,
         };
 
         let response = self
             .client
             .post(&self.base_url)
+            .header("Content-Type", "application/json")
+            .header(
+                "Authorization",
+                format!("Bearer {}", std::env::var("OPENAI_API_KEY")?),
+            )
             .json(&request)
             .send()
             .await?;
@@ -62,10 +71,10 @@ impl LLM for Ollama {
 
         match serde_json::from_str::<Response>(&response_text) {
             Ok(response) => {
-                if response.response.is_empty() {
-                    return Err(anyhow::anyhow!("Empty response from Ollama"));
+                if response.choices.is_empty() {
+                    return Err(anyhow::anyhow!("No choices in response"));
                 }
-                Ok(response.response)
+                Ok(response.choices[0].message.content.clone())
             }
             Err(e) => {
                 println!("JSON parsing error: {}", e);
@@ -76,7 +85,6 @@ impl LLM for Ollama {
     }
 }
 
-#[cfg(feature = "integration-tests")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,13 +92,13 @@ mod tests {
     use std::env;
     use tokio;
 
-    const TEST_MODEL: &str = "llama2";
+    const TEST_MODEL: &str = "gpt-4o";
     const TEST_SYSTEM_PROMPT: &str = "You are a helpful AI assistant.";
-    const BASE_URL: &str = "http://localhost:11434/api/generate";
+    const BASE_URL: &str = "https://api.openai.com/v1/chat/completions";
 
-    fn setup_ollama() -> Ollama {
+    fn setup_openai() -> OpenAI {
         dotenv().ok();
-        Ollama::new(
+        OpenAI::new(
             TEST_MODEL.to_string(),
             BASE_URL.to_string(),
             TEST_SYSTEM_PROMPT.to_string(),
@@ -99,42 +107,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_chat_success() {
-        let ollama = setup_ollama();
+        dotenv().ok();
+        let openai = setup_openai();
         let messages = vec![ChatMessage {
             role: "user".to_string(),
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = ollama.chat(&messages).await;
-        assert!(
-            result.is_ok(),
-            "Chat should succeed with valid Ollama server"
-        );
+        let result = openai.chat(&messages).await;
+        assert!(result.is_ok(), "Chat should succeed with valid API key");
 
         let response = result.unwrap();
         assert!(!response.is_empty(), "Response should not be empty");
     }
 
     #[tokio::test]
-    async fn test_chat_server_unavailable() {
-        let mut ollama = setup_ollama();
-        // Point to non-existent server
-        ollama.base_url = "http://localhost:99999/api/generate".to_string();
+    async fn test_chat_invalid_api_key() {
+        // Temporarily set invalid API key
+        env::set_var("OPENAI_API_KEY", "invalid_key");
 
+        let openai = setup_openai();
         let messages = vec![ChatMessage {
             role: "user".to_string(),
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = ollama.chat(&messages).await;
-        assert!(result.is_err(), "Chat should fail with invalid server");
-    }
-
-    #[test]
-    fn test_ollama_initialization() {
-        let ollama = setup_ollama();
-        assert_eq!(ollama.model, TEST_MODEL);
-        assert_eq!(ollama.base_url, BASE_URL);
-        assert_eq!(ollama.system_prompt, TEST_SYSTEM_PROMPT);
+        let result = openai.chat(&messages).await;
+        assert!(result.is_err(), "Chat should fail with invalid API key");
     }
 }

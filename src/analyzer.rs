@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use log::info;
 use std::path::PathBuf;
 
-use crate::llms::LLM;
+use crate::llms::{ChatMessage, LLM};
 use crate::prompts::{self, vuln_specific};
 use crate::response::Response;
 use crate::symbol_finder::{CodeDefinition, SymbolExtractor};
@@ -37,7 +37,12 @@ pub async fn analyze_file(
         prompts::GUIDELINES_TEMPLATE,
     );
 
-    let chat_response = llm.chat(&prompt).await?;
+    let messages = vec![ChatMessage {
+        role: "user".to_string(),
+        content: prompt,
+    }];
+
+    let chat_response = llm.chat(&messages).await?;
     let response: Response = serde_json::from_str(&chat_response)?;
     info!("Initial analysis complete");
 
@@ -78,7 +83,11 @@ pub async fn analyze_file(
                     previous_analysis,
                 );
 
-                let chat_response = llm.chat(&prompt).await?;
+                let messages = vec![ChatMessage {
+                    role: "user".to_string(),
+                    content: prompt.clone(),
+                }];
+                let chat_response = llm.chat(&messages).await?;
                 let vuln_response: Response = serde_json::from_str(&chat_response)?;
 
                 if verbosity > 0 {
