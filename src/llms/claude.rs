@@ -26,17 +26,11 @@ impl Claude {
 #[async_trait]
 impl LLM for Claude {
     async fn chat(&self, messages: &[ChatMessage]) -> Result<String> {
-        #[derive(Serialize)]
+#[derive(Serialize)]
         struct Request {
             model: String,
             max_tokens: u32,
             messages: Vec<Message>,
-            response_format: ResponseFormat,
-        }
-
-        #[derive(Serialize)]
-        struct ResponseFormat {
-            r#type: String,
         }
 
         #[derive(Serialize)]
@@ -114,11 +108,6 @@ impl LLM for Claude {
             model: self.model.clone(),
             max_tokens: 1024,
             messages: all_messages,
-            response_format: {
-                ResponseFormat {
-                    r#type: "json_object".to_string(),
-                }
-            },
         };
 
         let response = self
