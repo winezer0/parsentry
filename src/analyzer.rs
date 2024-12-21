@@ -2,6 +2,7 @@ use anyhow::{Error, Result};
 use genai::chat::{ChatMessage, ChatOptions, ChatRequest, JsonSpec};
 use genai::{Client, ClientConfig};
 use log::info;
+use regex::escape;
 use std::path::PathBuf;
 
 use crate::prompts::{self, vuln_specific};
@@ -146,19 +147,27 @@ pub async fn analyze_file(
 
                 // Extract new context code
                 for context in vuln_response.context_code {
+                    let escaped_name = escape(&context.name);
+                    let escaped_code_line = escape(&context.code_line);
                     if !stored_code_definitions
                         .iter()
-                        .any(|def| def.name == context.name)
+                        .any(|def| def.name == escaped_name)
                     {
-                        if let Some(def) =
-                            code_extractor.extract(&context.name, &context.code_line, files)
+                        if let Some(mut def) =
+                            code_extractor.extract(&escaped_name, &escaped_code_line, files)
                         {
+                            let formatted_source = def.source.replace(
+                                &escaped_code_line,
+                                &format!("\n{}\n", &escaped_code_line),
+                            );
+                            def.source = formatted_source;
                             stored_code_definitions.push(def);
                         } else {
-                            log::error!(
+                            log::warn!(
                                 "Failed to extract code definition for context: {}",
-                                context.name
+                                escaped_name
                             );
+                            continue;
                         }
                     }
                 }

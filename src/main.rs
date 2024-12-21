@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use dotenv::dotenv;
-use genai::chat::{ChatMessage, ChatOptions, ChatRequest, ChatResponseFormat};
-use genai::{Client, ClientConfig};
+use genai::chat::{ChatMessage, ChatRequest};
+use genai::Client;
 use log::{info, warn};
 use std::path::PathBuf;
 
@@ -101,10 +101,6 @@ async fn main() -> Result<()> {
         .await?;
 
         analysis_result.print_readable();
-
-        println!("\nPress Enter to continue...");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
     }
 
     println!("\n✅ Analysis complete!\n");
