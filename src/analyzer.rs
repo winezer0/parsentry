@@ -1,15 +1,16 @@
 use anyhow::{Error, Result};
+use genai::chat::{ChatMessage, ChatOptions, ChatRequest, JsonSpec};
+use genai::{Client, ClientConfig};
 use log::info;
 use std::path::PathBuf;
 
-use crate::llms::{ChatMessage, LLM};
 use crate::prompts::{self, vuln_specific};
-use crate::response::Response;
+use crate::response::{response_json_schema, Response};
 use crate::symbol_finder::{CodeDefinition, SymbolExtractor};
 
 pub async fn analyze_file(
     file_path: &PathBuf,
-    llm: &Box<dyn LLM>,
+    model: &str,
     code_extractor: &mut SymbolExtractor,
     files: &[PathBuf],
     verbosity: u8,
@@ -37,13 +38,35 @@ pub async fn analyze_file(
         prompts::GUIDELINES_TEMPLATE,
     );
 
-    let messages = vec![ChatMessage {
-        role: "user".to_string(),
-        content: prompt,
-    }];
+    let chat_req = ChatRequest::new(vec![
+        ChatMessage::system("You are a security vulnerability analyzer. Reply in JSON format"),
+        ChatMessage::user(&prompt),
+    ]);
 
-    let chat_response = llm.chat(&messages, Some("Response".to_string())).await?;
-    let response: Response = serde_json::from_str(&chat_response)?;
+    let client_config = ClientConfig::default().with_chat_options(
+        ChatOptions::default()
+            .with_response_format(JsonSpec::new("schema", response_json_schema())),
+    );
+    let json_client = Client::builder().with_config(client_config).build();
+    let chat_res = json_client.exec_chat(model, chat_req, None).await?;
+    let chat_content = match chat_res.content_text_as_str() {
+        Some(content) => content,
+        None => {
+            log::error!("Failed to get content text from chat response");
+            return Err(anyhow::anyhow!(
+                "Failed to get content text from chat response"
+            ));
+        }
+    };
+
+    let response: Response = match serde_json::from_str(chat_content) {
+        Ok(response) => response,
+        Err(e) => {
+            log::debug!("Failed to parse JSON response: {}", e);
+            log::debug!("Response content: {}", chat_content);
+            return Err(anyhow::anyhow!("Failed to parse JSON response: {}", e));
+        }
+    };
     info!("Initial analysis complete");
 
     // Secondary analysis for each vulnerability type
@@ -83,12 +106,32 @@ pub async fn analyze_file(
                     previous_analysis,
                 );
 
-                let messages = vec![ChatMessage {
-                    role: "user".to_string(),
-                    content: prompt.clone(),
-                }];
-                let chat_response = llm.chat(&messages, Some("Response".to_string())).await?;
-                let vuln_response: Response = serde_json::from_str(&chat_response)?;
+                let chat_req = ChatRequest::new(vec![
+                    ChatMessage::system(
+                        "You are a security vulnerability analyzer. Reply in JSON format",
+                    ),
+                    ChatMessage::user(&prompt),
+                ]);
+
+                let chat_res = json_client.exec_chat(model, chat_req, None).await?;
+                let chat_content = match chat_res.content_text_as_str() {
+                    Some(content) => content,
+                    None => {
+                        log::error!("Failed to get content text from chat response");
+                        return Err(anyhow::anyhow!(
+                            "Failed to get content text from chat response"
+                        ));
+                    }
+                };
+
+                let vuln_response: Response = match serde_json::from_str(chat_content) {
+                    Ok(response) => response,
+                    Err(e) => {
+                        log::debug!("Failed to parse JSON response: {}", e);
+                        log::debug!("Response content: {}", chat_content);
+                        return Err(anyhow::anyhow!("Failed to parse JSON response: {}", e));
+                    }
+                };
 
                 if verbosity > 0 {
                     return Ok(vuln_response);
@@ -111,6 +154,11 @@ pub async fn analyze_file(
                             code_extractor.extract(&context.name, &context.code_line, files)
                         {
                             stored_code_definitions.push(def);
+                        } else {
+                            log::error!(
+                                "Failed to extract code definition for context: {}",
+                                context.name
+                            );
                         }
                     }
                 }

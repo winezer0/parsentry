@@ -23,6 +23,7 @@ tree-sitter-rust = "0.20"
 tree-sitter-go = "0.20"
 tree-sitter-java = "0.20"
 dotenv = "0.15"
+genai = "0.1.15"
 
 [dev-dependencies]
 tempfile = "3.10"

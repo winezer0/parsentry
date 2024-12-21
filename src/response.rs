@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum VulnType {
@@ -27,6 +28,38 @@ pub struct Response {
     pub confidence_score: i32,
     pub vulnerability_types: Vec<VulnType>,
     pub context_code: Vec<ContextCode>,
+}
+
+pub fn response_json_schema() -> serde_json::Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "scratchpad": { "type": "string" },
+            "analysis": { "type": "string" },
+            "poc": { "type": "string" },
+            "confidence_score": { "type": "integer" },
+            "vulnerability_types": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"]
+                }
+            },
+            "context_code": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string" },
+                        "reason": { "type": "string" },
+                        "code_line": { "type": "string" }
+                    },
+                    "required": ["name", "reason", "code_line"]
+                }
+            }
+        },
+        "required": ["scratchpad", "analysis", "poc", "confidence_score", "vulnerability_types", "context_code"]
+    })
 }
 
 impl Response {

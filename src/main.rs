@@ -1,11 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
 use dotenv::dotenv;
+use genai::chat::{ChatMessage, ChatOptions, ChatRequest, ChatResponseFormat};
+use genai::{Client, ClientConfig};
 use log::{info, warn};
 use std::path::PathBuf;
 
 use vulnhuntrs::analyzer::analyze_file;
-use vulnhuntrs::llms::initialize_llm;
 use vulnhuntrs::prompts::{README_SUMMARY_PROMPT_TEMPLATE, SYS_PROMPT_TEMPLATE};
 use vulnhuntrs::repo::RepoOps;
 use vulnhuntrs::symbol_finder::SymbolExtractor;
@@ -21,9 +22,9 @@ struct Args {
     #[arg(short, long)]
     analyze: Option<PathBuf>,
 
-    /// LLM client to use (default: claude)
-    #[arg(short, long, default_value = "claude")]
-    llm: String,
+    /// LLM model to use (default: claude-3-haiku-20240307)
+    #[arg(short, long, default_value = "claude-3-haiku-20240307")]
+    model: String,
 
     /// Increase output verbosity
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -57,30 +58,33 @@ async fn main() -> Result<()> {
         repo.get_network_related_files(&files)
     };
 
+    // Initialize genai client
+    let client = Client::default();
+
     // Read README content
-    let mut system_prompt = SYS_PROMPT_TEMPLATE.to_string();
+    // let system_prompt = SYS_PROMPT_TEMPLATE.to_string();
     if let Some(readme_content) = repo.get_readme_content() {
         println!("📖 Analyzing project README...");
         info!("Summarizing project README");
         log::debug!("README content length: {} characters", readme_content.len());
-        let llm = initialize_llm(&args.llm, SYS_PROMPT_TEMPLATE)?;
-        let messages = vec![vulnhuntrs::llms::ChatMessage {
-            role: "user".to_string(),
-            content: format!("{}\n{}", readme_content, README_SUMMARY_PROMPT_TEMPLATE),
-        }];
-        log::debug!(
-            "Sending README summary request with {} characters",
-            messages[0].content.len()
-        );
-        let summary = llm.chat(&messages[..], None).await?;
+
+        let chat_req = ChatRequest::new(vec![
+            ChatMessage::system(SYS_PROMPT_TEMPLATE),
+            ChatMessage::user(format!(
+                "{}\n{}",
+                readme_content, README_SUMMARY_PROMPT_TEMPLATE
+            )),
+        ]);
+
+        log::debug!("Sending README summary request");
+        let chat_res = client.exec_chat(&args.model, chat_req, None).await?;
+        let summary = chat_res.content_text_as_str().unwrap_or_default();
         info!("README summary complete");
         log::debug!("Received README summary of {} characters", summary.len());
-        system_prompt = format!("{}\n\nProject Context:\n{}", system_prompt, summary);
+        // system_prompt = format!("{}\n\nProject Context:\n{}", system_prompt, summary);
     } else {
         warn!("No README summary found");
     }
-
-    let llm = initialize_llm(&args.llm, &system_prompt)?;
 
     for file_path in files_to_analyze {
         let file_name = file_path.display().to_string();
@@ -89,7 +93,7 @@ async fn main() -> Result<()> {
 
         let analysis_result = analyze_file(
             &file_path,
-            &llm,
+            &args.model,
             &mut code_extractor,
             &files,
             args.verbosity,
