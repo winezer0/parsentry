@@ -12,7 +12,11 @@ use tokio;
 
 #[async_trait]
 pub trait LLM {
-    async fn chat(&self, messages: &[ChatMessage]) -> Result<String>;
+    async fn chat(
+        &self,
+        messages: &[ChatMessage],
+        response_model: Option<String>,
+    ) -> Result<String>;
 }
 
 // OpenAI Message type
@@ -76,7 +80,7 @@ mod tests {
             role: "user".to_string(),
             content: "Say 'test successful' in exactly those words.".to_string(),
         }];
-        let response = claude.chat(&messages[..]).await?;
+        let response = claude.chat(&messages[..], None).await?;
         assert!(
             response.len() > 0,
             "Claude response has a length greater than 0"
@@ -93,7 +97,7 @@ mod tests {
             role: "user".to_string(),
             content: "Say 'test successful' in exactly those words.".to_string(),
         }];
-        let response = openai.chat(&messages[..]).await?;
+        let response = openai.chat(&messages[..], None).await?;
         assert!(
             response.len() > 0,
             "OpenAI response has a length greater than 0"
@@ -110,7 +114,7 @@ mod tests {
             role: "user".to_string(),
             content: "Say 'test successful' in exactly those words.".to_string(),
         }];
-        let response = ollama.chat(&messages[..]).await?;
+        let response = ollama.chat(&messages[..], None).await?;
         assert!(
             response.len() > 0,
             "Ollama response has a length greater than 0"

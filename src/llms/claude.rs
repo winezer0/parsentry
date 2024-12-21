@@ -25,8 +25,12 @@ impl Claude {
 
 #[async_trait]
 impl LLM for Claude {
-    async fn chat(&self, messages: &[ChatMessage]) -> Result<String> {
-#[derive(Serialize)]
+    async fn chat(
+        &self,
+        messages: &[ChatMessage],
+        response_model: Option<String>,
+    ) -> Result<String> {
+        #[derive(Serialize)]
         struct Request {
             model: String,
             max_tokens: u32,
@@ -140,7 +144,27 @@ impl LLM for Claude {
                     log::error!("Empty response content: {}", response_text);
                     return Err(anyhow::anyhow!("Empty response content"));
                 }
-                Ok(response.content[0].text.clone())
+                if let Some(model) = response_model {
+                    let json_str = response.content[0].text.clone();
+                    let parsed_model: Result<_, _> = serde_json::from_str(&json_str);
+                    match parsed_model {
+                        Ok(model) => Ok(model),
+                        Err(parse_error) => {
+                            log::error!(
+                                "JSON Parsing error: {} | Raw response: {}",
+                                parse_error,
+                                response_text
+                            );
+                            Err(anyhow::anyhow!(
+                                "Parsing error: {} | Raw response: {}",
+                                parse_error,
+                                response_text
+                            ))
+                        }
+                    }
+                } else {
+                    Ok(response.content[0].text.clone())
+                }
             }
             Err(parse_error) => {
                 log::error!(
@@ -187,7 +211,7 @@ mod tests {
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = claude.chat(&messages).await;
+        let result = claude.chat(&messages, None).await;
         assert!(result.is_ok(), "Chat should succeed with valid API key");
 
         let response = result.unwrap();
@@ -204,7 +228,7 @@ mod tests {
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = claude.chat(&messages).await;
+        let result = claude.chat(&messages, None).await;
         assert!(result.is_err(), "Chat should fail with invalid API key");
     }
 
@@ -224,7 +248,7 @@ mod tests {
             content: "".to_string(),
         }];
 
-        let result = claude.chat(&messages).await;
+        let result = claude.chat(&messages, None).await;
         assert!(result.is_err(), "Chat should fail with empty message");
         assert!(result
             .unwrap_err()

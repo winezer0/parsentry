@@ -5,7 +5,6 @@ use log::{info, warn};
 use std::path::PathBuf;
 
 use vulnhuntrs::analyzer::analyze_file;
-use vulnhuntrs::evaluator::evaluate_python_vulnerable_app;
 use vulnhuntrs::llms::initialize_llm;
 use vulnhuntrs::prompts::{README_SUMMARY_PROMPT_TEMPLATE, SYS_PROMPT_TEMPLATE};
 use vulnhuntrs::repo::RepoOps;
@@ -73,7 +72,7 @@ async fn main() -> Result<()> {
             "Sending README summary request with {} characters",
             messages[0].content.len()
         );
-        let summary = llm.chat(&messages[..]).await?;
+        let summary = llm.chat(&messages[..], None).await?;
         info!("README summary complete");
         log::debug!("Received README summary of {} characters", summary.len());
         system_prompt = format!("{}\n\nProject Context:\n{}", system_prompt, summary);
@@ -98,16 +97,6 @@ async fn main() -> Result<()> {
         .await?;
 
         analysis_result.print_readable();
-
-        // If evaluation mode is enabled and we're analyzing an example vulnerable app
-        if args.evaluate && file_name.contains("python-vulnerable-app") {
-            println!("\n📊 Evaluating Analysis Report...\n");
-            println!("{}", "=".repeat(80));
-
-            let eval_result =
-                evaluate_python_vulnerable_app(&analysis_result, llm.as_ref()).await?;
-            eval_result.print_readable();
-        }
 
         println!("\nPress Enter to continue...");
         let mut input = String::new();

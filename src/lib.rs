@@ -1,5 +1,4 @@
 pub mod analyzer;
-pub mod evaluator;
 pub mod llms;
 pub mod parser;
 pub mod prompts;

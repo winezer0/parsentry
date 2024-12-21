@@ -42,7 +42,7 @@ pub async fn analyze_file(
         content: prompt,
     }];
 
-    let chat_response = llm.chat(&messages).await?;
+    let chat_response = llm.chat(&messages, Some("Response".to_string())).await?;
     let response: Response = serde_json::from_str(&chat_response)?;
     info!("Initial analysis complete");
 
@@ -87,7 +87,7 @@ pub async fn analyze_file(
                     role: "user".to_string(),
                     content: prompt.clone(),
                 }];
-                let chat_response = llm.chat(&messages).await?;
+                let chat_response = llm.chat(&messages, Some("Response".to_string())).await?;
                 let vuln_response: Response = serde_json::from_str(&chat_response)?;
 
                 if verbosity > 0 {

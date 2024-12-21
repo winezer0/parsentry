@@ -25,11 +25,24 @@ impl OpenAI {
 
 #[async_trait]
 impl LLM for OpenAI {
-    async fn chat(&self, prompt: &[ChatMessage]) -> Result<String> {
+    async fn chat(
+        &self,
+        messages: &[ChatMessage],
+        response_model: Option<String>,
+    ) -> Result<String> {
         #[derive(Serialize)]
         struct Request {
             model: String,
             messages: Vec<ChatMessage>,
+            max_tokens: u32,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            response_format: Option<ResponseFormat>,
+        }
+
+        #[derive(Serialize)]
+        struct ResponseFormat {
+            #[serde(rename = "type")]
+            format_type: String,
         }
 
         #[derive(Deserialize)]
@@ -42,15 +55,27 @@ impl LLM for OpenAI {
             message: ChatMessage,
         }
 
-        let mut messages = vec![ChatMessage {
+        let mut all_messages = vec![ChatMessage {
             role: "system".to_string(),
             content: self.system_prompt.clone(),
         }];
-        messages.extend_from_slice(prompt);
+        all_messages.extend_from_slice(messages);
+
+        let response_format = if messages.iter().any(|msg| msg.content.contains("json")) {
+            Some(ResponseFormat {
+                format_type: "json_object".to_string(),
+            })
+        } else {
+            response_model.clone().map(|_| ResponseFormat {
+                format_type: "json_object".to_string(),
+            })
+        };
 
         let request = Request {
             model: self.model.clone(),
-            messages,
+            messages: all_messages,
+            max_tokens: 1024,
+            response_format,
         };
 
         let response = self
@@ -74,7 +99,20 @@ impl LLM for OpenAI {
                 if response.choices.is_empty() {
                     return Err(anyhow::anyhow!("No choices in response"));
                 }
-                Ok(response.choices[0].message.content.clone())
+                if response_model.is_some() {
+                    let json_str = response.choices[0].message.content.clone();
+                    let parsed_model: Result<_, _> = serde_json::from_str(&json_str);
+                    match parsed_model {
+                        Ok(model) => Ok(model),
+                        Err(parse_error) => {
+                            println!("JSON Parsing error: {}", parse_error);
+                            println!("Failed to parse response: {}", response_text);
+                            Err(parse_error.into())
+                        }
+                    }
+                } else {
+                    Ok(response.choices[0].message.content.clone())
+                }
             }
             Err(e) => {
                 println!("JSON parsing error: {}", e);
@@ -114,7 +152,7 @@ mod tests {
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = openai.chat(&messages).await;
+        let result = openai.chat(&messages, None).await;
         assert!(result.is_ok(), "Chat should succeed with valid API key");
 
         let response = result.unwrap();
@@ -132,7 +170,7 @@ mod tests {
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = openai.chat(&messages).await;
+        let result = openai.chat(&messages, None).await;
         assert!(result.is_err(), "Chat should fail with invalid API key");
     }
 }

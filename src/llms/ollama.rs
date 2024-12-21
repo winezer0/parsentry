@@ -25,7 +25,11 @@ impl Ollama {
 
 #[async_trait]
 impl LLM for Ollama {
-    async fn chat(&self, messages: &[ChatMessage]) -> Result<String> {
+    async fn chat(
+        &self,
+        messages: &[ChatMessage],
+        response_model: Option<String>,
+    ) -> Result<String> {
         #[derive(Serialize)]
         struct Request {
             model: String,
@@ -65,7 +69,19 @@ impl LLM for Ollama {
                 if response.response.is_empty() {
                     return Err(anyhow::anyhow!("Empty response from Ollama"));
                 }
-                Ok(response.response)
+                if let Some(model) = response_model {
+                    let parsed_model: Result<_, _> = serde_json::from_str(&response.response);
+                    match parsed_model {
+                        Ok(model) => Ok(model),
+                        Err(parse_error) => {
+                            println!("JSON Parsing error: {}", parse_error);
+                            println!("Failed to parse response: {}", response_text);
+                            Err(parse_error.into())
+                        }
+                    }
+                } else {
+                    Ok(response.response)
+                }
             }
             Err(e) => {
                 println!("JSON parsing error: {}", e);
@@ -105,7 +121,7 @@ mod tests {
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = ollama.chat(&messages).await;
+        let result = ollama.chat(&messages, None).await;
         assert!(
             result.is_ok(),
             "Chat should succeed with valid Ollama server"
@@ -126,7 +142,7 @@ mod tests {
             content: "What is 2+2?".to_string(),
         }];
 
-        let result = ollama.chat(&messages).await;
+        let result = ollama.chat(&messages, None).await;
         assert!(result.is_err(), "Chat should fail with invalid server");
     }
 
