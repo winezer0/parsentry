@@ -9,7 +9,6 @@ use std::path::PathBuf;
 use vulnhuntrs::analyzer::analyze_file;
 use vulnhuntrs::prompts::{README_SUMMARY_PROMPT_TEMPLATE, SYS_PROMPT_TEMPLATE};
 use vulnhuntrs::repo::RepoOps;
-use vulnhuntrs::symbol_finder::SymbolExtractor;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -42,7 +41,6 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
     let repo = RepoOps::new(args.root.clone());
-    let mut code_extractor = SymbolExtractor::new(&args.root);
 
     println!("\n🔍 Vulnhuntrs - Security Analysis Tool\n");
 
@@ -62,7 +60,6 @@ async fn main() -> Result<()> {
     let client = Client::default();
 
     // Read README content
-    // let system_prompt = SYS_PROMPT_TEMPLATE.to_string();
     if let Some(readme_content) = repo.get_readme_content() {
         println!("📖 Analyzing project README...");
         info!("Summarizing project README");
@@ -81,7 +78,6 @@ async fn main() -> Result<()> {
         let summary = chat_res.content_text_as_str().unwrap_or_default();
         info!("README summary complete");
         log::debug!("Received README summary of {} characters", summary.len());
-        // system_prompt = format!("{}\n\nProject Context:\n{}", system_prompt, summary);
     } else {
         warn!("No README summary found");
     }
@@ -91,14 +87,7 @@ async fn main() -> Result<()> {
         println!("\n📄 Analyzing: {}\n", file_name);
         println!("{}", "=".repeat(80));
 
-        let analysis_result = analyze_file(
-            &file_path,
-            &args.model,
-            &mut code_extractor,
-            &files,
-            args.verbosity,
-        )
-        .await?;
+        let analysis_result = analyze_file(&file_path, &args.model, &files, args.verbosity).await?;
 
         analysis_result.print_readable();
     }

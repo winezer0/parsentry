@@ -5,18 +5,25 @@ use log::info;
 use regex::escape;
 use std::path::PathBuf;
 
+use crate::parser::CodeParser;
 use crate::prompts::{self, vuln_specific};
 use crate::response::{response_json_schema, Response};
-use crate::symbol_finder::{CodeDefinition, SymbolExtractor};
 
 pub async fn analyze_file(
     file_path: &PathBuf,
     model: &str,
-    code_extractor: &mut SymbolExtractor,
     files: &[PathBuf],
     verbosity: u8,
 ) -> Result<Response, Error> {
     info!("Performing initial analysis of {}", file_path.display());
+
+    // Initialize parser
+    let mut parser = CodeParser::new()?;
+
+    // Add all files to the parser for cross-reference analysis
+    for file in files {
+        parser.add_file(file)?;
+    }
 
     let content = std::fs::read_to_string(file_path)?;
     if content.is_empty() {
@@ -77,7 +84,7 @@ pub async fn analyze_file(
         for vuln_type in response.vulnerability_types.clone() {
             let vuln_info = vuln_info_map.get(&vuln_type).unwrap();
 
-            let mut stored_code_definitions: Vec<CodeDefinition> = Vec::new();
+            let mut stored_code_definitions = Vec::new();
             let mut previous_analysis = String::new();
 
             for _ in 0..7 {
@@ -87,7 +94,7 @@ pub async fn analyze_file(
                 );
 
                 let mut context_code = String::new();
-                for def in &stored_code_definitions {
+                for (_, def) in &stored_code_definitions {
                     context_code.push_str(&format!(
                         "\nFunction: {}\nSource:\n{}\n",
                         def.name, def.source
@@ -145,22 +152,14 @@ pub async fn analyze_file(
                     break;
                 }
 
-                // Extract new context code
+                // Extract new context code using Parser
                 for context in vuln_response.context_code {
                     let escaped_name = escape(&context.name);
-                    let escaped_code_line = escape(&context.code_line);
                     if !stored_code_definitions
                         .iter()
-                        .any(|def| def.name == escaped_name)
+                        .any(|(_, def)| def.name == escaped_name)
                     {
-                        if let Some(mut def) =
-                            code_extractor.extract(&escaped_name, &escaped_code_line, files)
-                        {
-                            let formatted_source = def.source.replace(
-                                &escaped_code_line,
-                                &format!("\n{}\n", &escaped_code_line),
-                            );
-                            def.source = formatted_source;
+                        if let Some(def) = parser.find_definition(&escaped_name, file_path) {
                             stored_code_definitions.push(def);
                         } else {
                             log::warn!(
