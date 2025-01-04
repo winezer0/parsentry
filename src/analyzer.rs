@@ -159,14 +159,22 @@ pub async fn analyze_file(
                         .iter()
                         .any(|(_, def)| def.name == escaped_name)
                     {
-                        if let Some(def) = parser.find_definition(&escaped_name, file_path) {
-                            stored_code_definitions.push(def);
-                        } else {
-                            log::warn!(
-                                "Failed to extract code definition for context: {}",
-                                escaped_name
-                            );
-                            continue;
+                        match parser.find_definition(&escaped_name, file_path) {
+                            Ok(Some(def)) => {
+                                stored_code_definitions.push(def);
+                            }
+                            Ok(None) => {
+                                log::warn!("No definition found for context: {}", escaped_name);
+                                continue;
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "Failed to extract code definition for context {}: {}",
+                                    escaped_name,
+                                    e
+                                );
+                                continue;
+                            }
                         }
                     }
                 }
