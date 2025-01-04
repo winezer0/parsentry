@@ -1,13 +1,11 @@
 use anyhow::Result;
+use anyhow::Result;
 use log::{debug, trace};
+use stack_graphs::graph::StackGraph;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use tree_sitter_stack_graphs::{
-    c::CLanguage, cpp::CppLanguage, go::GoLanguage, java::JavaLanguage,
-    javascript::JavaScriptLanguage, php::PhpLanguage, python::PythonLanguage, ruby::RubyLanguage,
-    rust::RustLanguage, typescript::TypeScriptLanguage, NoCancellation, StackGraph,
-    StackGraphLanguage,
-};
+use tree_sitter::Language;
+use tree_sitter_stack_graphs::{NoCancellation, StackGraph, StackGraphLanguage};
 
 #[derive(Debug, Clone)]
 pub struct Definition {
