@@ -8,12 +8,12 @@ cc = "1.0"
 
 [dependencies]
 tree-sitter = "0.24"
-stack-graphs = { git = "https://github.com/nohehf/stack-graphs.git", rev = "3c4d1a6c374d9cdc7af9626423dbc3607a85dc66", features = ["storage"] }
-tree-sitter-stack-graphs = { git = "https://github.com/nohehf/stack-graphs.git", rev = "3c4d1a6c374d9cdc7af9626423dbc3607a85dc66", features = ["cli"] }
-tree-sitter-stack-graphs-java = { git = "https://github.com/nohehf/stack-graphs.git", rev = "3c4d1a6c374d9cdc7af9626423dbc3607a85dc66" }
-tree-sitter-stack-graphs-javascript = { git = "https://github.com/nohehf/stack-graphs.git", rev = "3c4d1a6c374d9cdc7af9626423dbc3607a85dc66" }
-tree-sitter-stack-graphs-python = { git = "https://github.com/nohehf/stack-graphs.git", rev = "3c4d1a6c374d9cdc7af9626423dbc3607a85dc66" }
-tree-sitter-stack-graphs-typescript = { git = "https://github.com/nohehf/stack-graphs.git", rev = "3c4d1a6c374d9cdc7af9626423dbc3607a85dc66" }
+stack-graphs = { git = "https://github.com/github/stack-graphs.git", rev = "2f261d4", features = ["storage"] }
+tree-sitter-stack-graphs = { git = "https://github.com/github/stack-graphs.git", rev = "2f261d4", features = ["cli"] }
+tree-sitter-stack-graphs-java = { git = "https://github.com/github/stack-graphs.git", rev = "2f261d4" }
+tree-sitter-stack-graphs-javascript = { git = "https://github.com/github/stack-graphs.git", rev = "2f261d4" }
+tree-sitter-stack-graphs-python = { git = "https://github.com/github/stack-graphs.git", rev = "2f261d4" }
+tree-sitter-stack-graphs-typescript = { git = "https://github.com/github/stack-graphs.git", rev = "2f261d4" }
 tokio = { version = "1.36", features = ["full"] }
 clap = { version = "4.5", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json"] }
