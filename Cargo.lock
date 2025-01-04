@@ -2238,6 +2238,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cc",
  "clap",
  "dotenv",
  "env_logger",
@@ -2250,6 +2251,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tree-sitter 0.20.10",
  "tree-sitter-stack-graphs",
 ]
 
