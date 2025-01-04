@@ -126,6 +126,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
 
 [[package]]
+name = "async-stream"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.90",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -337,7 +359,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1460,7 +1482,8 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 [[package]]
 name = "lsp-positions"
 version = "0.3.4"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562e6bd1c8366ac1cbe8a37057f530c40101eb8f4e98ce005be641c99d7331c8"
 dependencies = [
  "bincode",
  "memchr",
@@ -2188,7 +2211,8 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 [[package]]
 name = "stack-graphs"
 version = "0.14.1"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d369305747128ef353193fa34350c26fbc545ac70d2f97eb7321f72afd077109"
 dependencies = [
  "bincode",
  "bitvec",
@@ -2465,6 +2489,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-test"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2468baabc3311435b55dd935f702f42cd1b8abb7e754fb7dfb16bd36aa88f9f7"
+dependencies = [
+ "async-stream",
+ "bytes",
+ "futures-core",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2622,7 +2659,8 @@ dependencies = [
 [[package]]
 name = "tree-sitter-stack-graphs"
 version = "0.10.0"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b1ec17a8132152aa61ab17e2bd10d3ca6bd6515f15de5d39d224831642720bf"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2655,7 +2693,8 @@ dependencies = [
 [[package]]
 name = "tree-sitter-stack-graphs-java"
 version = "0.5.0"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7d36213fcb299a43a136cfd7fd695da1da399591da6674690eb1bdeab4207e2"
 dependencies = [
  "tree-sitter-java",
  "tree-sitter-stack-graphs",
@@ -2664,7 +2703,8 @@ dependencies = [
 [[package]]
 name = "tree-sitter-stack-graphs-javascript"
 version = "0.3.0"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cf0d8eabe131c10b2d7f997fa841805b02d897f626491484188d60ce1d94583"
 dependencies = [
  "serde",
  "serde_json",
@@ -2677,7 +2717,8 @@ dependencies = [
 [[package]]
 name = "tree-sitter-stack-graphs-python"
 version = "0.3.0"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "954a91a2992348e86a6beb74eec6526bb54e94e7bc39bff597adda0b6cb9030d"
 dependencies = [
  "tree-sitter-python",
  "tree-sitter-stack-graphs",
@@ -2686,7 +2727,8 @@ dependencies = [
 [[package]]
 name = "tree-sitter-stack-graphs-typescript"
 version = "0.4.0"
-source = "git+https://github.com/github/stack-graphs.git?rev=2f261d4#2f261d481644ccf898ac77968f6f5720262e8603"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d379c4e0c08fc28872d7653b560171474cf2124d1f7afa5715435c8a328fd72"
 dependencies = [
  "anyhow",
  "glob",
@@ -2856,6 +2898,7 @@ dependencies = [
  "stack-graphs",
  "tempfile",
  "tokio",
+ "tokio-test",
  "tree-sitter",
  "tree-sitter-stack-graphs",
  "tree-sitter-stack-graphs-java",
@@ -3001,7 +3044,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

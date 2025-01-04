@@ -19,12 +19,14 @@ fn main() {
         .include(&dir)
         .include(&tree_sitter_dir)
         .file(dir.join("tree-sitter-go/src/parser.c"))
+        .flag("-Wno-unused-parameter")
         .compile("tree-sitter-go");
 
     cc::Build::new()
         .include(&dir)
         .include(&tree_sitter_dir)
         .file(dir.join("tree-sitter-java/src/parser.c"))
+        .flag("-Wno-unused-parameter")
         .compile("tree-sitter-java");
 
     cc::Build::new()
@@ -32,6 +34,7 @@ fn main() {
         .include(&tree_sitter_dir)
         .file(dir.join("tree-sitter-javascript/src/parser.c"))
         .file(dir.join("tree-sitter-javascript/src/scanner.c"))
+        .flag("-Wno-unused-parameter")
         .compile("tree-sitter-javascript");
 
     cc::Build::new()
@@ -39,6 +42,7 @@ fn main() {
         .include(&tree_sitter_dir)
         .file(dir.join("tree-sitter-python/src/parser.c"))
         .file(dir.join("tree-sitter-python/src/scanner.c"))
+        .flag("-Wno-unused-parameter")
         .compile("tree-sitter-python");
 
     cc::Build::new()
@@ -46,6 +50,7 @@ fn main() {
         .include(&tree_sitter_dir)
         .file(dir.join("tree-sitter-rust/src/parser.c"))
         .file(dir.join("tree-sitter-rust/src/scanner.c"))
+        .flag("-Wno-unused-parameter")
         .compile("tree-sitter-rust");
 
     cc::Build::new()
@@ -55,6 +60,7 @@ fn main() {
         .include(dir.join("tree-sitter-typescript/common"))
         .file(dir.join("tree-sitter-typescript/typescript/src/parser.c"))
         .file(dir.join("tree-sitter-typescript/typescript/src/scanner.c"))
+        .flag("-Wno-unused-parameter")
         .compile("tree-sitter-typescript");
 
     // Add library search path

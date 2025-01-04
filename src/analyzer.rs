@@ -18,7 +18,7 @@ pub async fn analyze_file(
     info!("Performing initial analysis of {}", file_path.display());
 
     // Initialize parser
-    let mut parser = CodeParser::new()?;
+    let mut parser = CodeParser::new(None)?;
 
     // Add all files to the parser for cross-reference analysis
     for file in files {
@@ -84,7 +84,7 @@ pub async fn analyze_file(
         for vuln_type in response.vulnerability_types.clone() {
             let vuln_info = vuln_info_map.get(&vuln_type).unwrap();
 
-            let mut stored_code_definitions = Vec::new();
+            let mut stored_code_definitions: Vec<(PathBuf, crate::parser::Definition)> = Vec::new();
             let mut previous_analysis = String::new();
 
             for _ in 0..7 {
