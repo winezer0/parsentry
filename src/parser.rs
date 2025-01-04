@@ -124,8 +124,76 @@ impl CodeParser {
     }
 
     pub fn find_definition(&self, name: &str, source_file: &Path) -> Option<(PathBuf, Definition)> {
-        // TODO
+        use stack_graphs::graph::Node;
+        use tree_sitter_stack_graphs::StackGraphLanguage;
 
-        None
+        // Get file extension to determine language
+        let ext = source_file
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
+
+        let language = self.languages.get(ext)?;
+
+        // Get file content
+        let content = self.files.get(source_file)?;
+
+        // Parse file and add to graph
+        let file_path = source_file.to_string_lossy().to_string();
+        let file_id = self.graph.add_file(&file_path);
+        
+        // Find definition node
+        self.graph
+            .iter_nodes()
+            .find_map(|node| {
+                if let Node::Symbol { name: node_name, source_info, .. } = node {
+                    if node_name.as_ref() == name {
+                        Some((
+                            source_file.to_path_buf(),
+                            Definition {
+                                name: name.to_string(),
+                                start_byte: source_info.span.start.byte as usize,
+                                end_byte: source_info.span.end.byte as usize,
+                                source: content[source_info.span.start.byte as usize..source_info.span.end.byte as usize].to_string(),
+                            },
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::path::PathBuf;
+
+        #[test]
+        fn test_find_definition() {
+            let mut parser = CodeParser::new(None).unwrap();
+            
+            // Create a temporary Python file with a function definition
+            let temp_dir = tempfile::tempdir().unwrap();
+            let file_path = temp_dir.path().join("test.py");
+            std::fs::write(&file_path, "def test_function():\n    pass\n").unwrap();
+            
+            parser.add_file(&file_path).unwrap();
+            
+            // Test finding the definition
+            let result = parser.find_definition("test_function", &file_path);
+            assert!(result.is_some());
+            
+            let (path, def) = result.unwrap();
+            assert_eq!(path, file_path);
+            assert_eq!(def.name, "test_function");
+            assert_eq!(def.source, "def test_function()");
+            
+            // Test finding non-existent definition
+            let result = parser.find_definition("non_existent", &file_path);
+            assert!(result.is_none());
+        }
     }
 }
