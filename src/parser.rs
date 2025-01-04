@@ -183,9 +183,76 @@ impl CodeParser {
     }
 
     pub fn find_references(&self, name: &str) -> Vec<(PathBuf, Definition)> {
+        use stack_graphs::graph::Node;
         let mut results = Vec::new();
+        let mut seen_positions = std::collections::HashSet::new();
 
-        // TODO
+        for (file_path, content) in &self.files {
+            let mut line_number = 0;
+            let mut in_import = false;
+
+            for line in content.lines() {
+                let line_start =
+                    content[..content.lines().take(line_number).collect::<String>().len()].len()
+                        + if line_number > 0 { 1 } else { 0 };
+
+                let line_trimmed = line.trim_start();
+                if line_trimmed.starts_with("from ") || line_trimmed.starts_with("import ") {
+                    in_import = true;
+                } else if line_trimmed.is_empty() {
+                    in_import = false;
+                }
+
+                // 関数定義行をスキップ
+                if line_trimmed.starts_with("def ") || line_trimmed.starts_with("function ") {
+                    line_number += 1;
+                    continue;
+                }
+
+                // インポート文をスキップ
+                if in_import {
+                    line_number += 1;
+                    continue;
+                }
+
+                if let Some(pos) = line.find(name) {
+                    // 変数代入や関数呼び出しの一部であることを確認
+                    let before_name = &line[..pos];
+                    let is_reference = before_name.ends_with(" = ")
+                        || before_name.ends_with("(")
+                        || before_name.ends_with(" ")
+                        || before_name.is_empty();
+
+                    if is_reference {
+                        let start_byte = line_start + pos;
+                        let end_byte = start_byte + name.len();
+
+                        let position = (file_path.clone(), start_byte, end_byte);
+                        if !seen_positions.contains(&position) {
+                            seen_positions.insert(position.clone());
+                            println!(
+                                "Found reference: {} at line {}, pos {}:{}",
+                                line,
+                                line_number + 1,
+                                start_byte,
+                                end_byte
+                            );
+                            results.push((
+                                file_path.clone(),
+                                Definition {
+                                    name: name.to_string(),
+                                    start_byte,
+                                    end_byte,
+                                    source: name.to_string(),
+                                },
+                            ));
+                        }
+                    }
+                }
+
+                line_number += 1;
+            }
+        }
 
         results
     }
@@ -264,6 +331,104 @@ mod tests {
         // Test finding non-existent definition
         let result = parser.find_definition("non_existent", &file_path)?;
         assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_references() -> Result<(), StackGraphsError> {
+        let mut parser = CodeParser::new(None)?;
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Create Python files with function definition and references
+        let file_path1 = temp_dir.path().join("main.py");
+        std::fs::write(
+            &file_path1,
+            r#"def test_function():
+    return "Hello"
+
+# Reference 1
+x = test_function
+
+# Reference 2
+if True:
+    y = test_function"#,
+        )
+        .unwrap();
+
+        let file_path2 = temp_dir.path().join("test.py");
+        std::fs::write(
+            &file_path2,
+            r#"from main import test_function
+
+# Reference 3
+def another_function():
+    z = test_function"#,
+        )
+        .unwrap();
+
+        // Add and parse files
+        parser.add_file(&file_path1)?;
+        parser.add_file(&file_path2)?;
+
+        // Test finding references
+        let references = parser.find_references("test_function");
+        assert_eq!(references.len(), 3, "Expected exactly 3 references");
+
+        // 各参照の検証
+        let main_refs: Vec<_> = references
+            .iter()
+            .filter(|(path, _)| path == &file_path1)
+            .collect();
+        let test_refs: Vec<_> = references
+            .iter()
+            .filter(|(path, _)| path == &file_path2)
+            .collect();
+
+        assert_eq!(main_refs.len(), 2, "Expected 2 references in main.py");
+        assert_eq!(test_refs.len(), 1, "Expected 1 reference in test.py");
+
+        // 参照のソースコードを検証
+        for (_, def) in references {
+            assert_eq!(def.name, "test_function");
+            assert_eq!(def.source, "test_function");
+        }
+
+        // Test finding non-existent references
+        let references = parser.find_references("non_existent");
+        assert!(references.is_empty());
+
+        // Test JavaScript references
+        let js_file = temp_dir.path().join("test.js");
+        std::fs::write(
+            &js_file,
+            r#"function testFunction() {
+    return true;
+}
+
+// Reference 1
+let x = testFunction();
+
+// Reference 2
+if (true) {
+    let y = testFunction();
+}"#,
+        )
+        .unwrap();
+
+        parser.add_file(&js_file)?;
+        let references = parser.find_references("testFunction");
+        assert_eq!(
+            references.len(),
+            2,
+            "Expected exactly 2 references in JS file"
+        );
+
+        for (path, def) in references {
+            assert_eq!(path, js_file);
+            assert_eq!(def.name, "testFunction");
+            assert_eq!(def.source, "testFunction");
+        }
 
         Ok(())
     }
