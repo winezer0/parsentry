@@ -29,35 +29,20 @@ impl fmt::Display for StackGraphsError {
 
 impl Error for StackGraphsError {}
 
-#[derive(Debug, Clone)]
-pub enum Language {
-    Python,
-    JavaScript,
-    TypeScript,
-    Java,
-}
-
-pub fn get_langauge_configuration(lang: &Language) -> LanguageConfiguration {
-    match lang {
-        Language::Python => {
-            tree_sitter_stack_graphs_python::language_configuration(&NoCancellation)
-        }
-        Language::JavaScript => {
-            tree_sitter_stack_graphs_javascript::language_configuration(&NoCancellation)
-        }
-        Language::TypeScript => {
-            tree_sitter_stack_graphs_typescript::language_configuration_typescript(&NoCancellation)
-        }
-        Language::Java => tree_sitter_stack_graphs_java::language_configuration(&NoCancellation),
-    }
-}
-
 pub fn get_language_configurations(language: &str) -> Vec<LanguageConfiguration> {
     match language.to_lowercase().as_str() {
-        "python" => vec![get_langauge_configuration(&Language::Python)],
-        "javascript" => vec![get_langauge_configuration(&Language::JavaScript)],
-        "typescript" => vec![get_langauge_configuration(&Language::TypeScript)],
-        "java" => vec![get_langauge_configuration(&Language::Java)],
+        "python" => vec![tree_sitter_stack_graphs_python::language_configuration(
+            &NoCancellation,
+        )],
+        "javascript" => vec![tree_sitter_stack_graphs_javascript::language_configuration(
+            &NoCancellation,
+        )],
+        "typescript" => vec![
+            tree_sitter_stack_graphs_typescript::language_configuration_typescript(&NoCancellation),
+        ],
+        "java" => vec![tree_sitter_stack_graphs_java::language_configuration(
+            &NoCancellation,
+        )],
         _ => vec![],
     }
 }
@@ -104,30 +89,18 @@ pub struct CodeParser {
     graph: StackGraph,
     db_writer: SQLiteWriter,
     files: HashMap<PathBuf, String>,
-    languages: HashMap<String, LanguageConfiguration>,
+    python_config: LanguageConfiguration,
+    javascript_config: LanguageConfiguration,
+    typescript_config: LanguageConfiguration,
+    java_config: LanguageConfiguration,
 }
 
 impl CodeParser {
     pub fn new(db_path: Option<&str>) -> Result<Self, StackGraphsError> {
-        let mut languages = HashMap::new();
-
-        // Add supported languages
-        languages.insert(
-            "py".to_string(),
-            get_langauge_configuration(&Language::Python),
-        );
-        languages.insert(
-            "js".to_string(),
-            get_langauge_configuration(&Language::JavaScript),
-        );
-        languages.insert(
-            "ts".to_string(),
-            get_langauge_configuration(&Language::TypeScript),
-        );
-        languages.insert(
-            "java".to_string(),
-            get_langauge_configuration(&Language::Java),
-        );
+        let mut python_configs = get_language_configurations("python");
+        let mut javascript_configs = get_language_configurations("javascript");
+        let mut typescript_configs = get_language_configurations("typescript");
+        let mut java_configs = get_language_configurations("java");
 
         let db_writer = if let Some(path) = db_path {
             SQLiteWriter::open(path)
@@ -142,7 +115,10 @@ impl CodeParser {
             graph: StackGraph::new(),
             db_writer,
             files: HashMap::new(),
-            languages,
+            python_config: python_configs.remove(0),
+            javascript_config: javascript_configs.remove(0),
+            typescript_config: typescript_configs.remove(0),
+            java_config: java_configs.remove(0),
         })
     }
 
@@ -162,7 +138,15 @@ impl CodeParser {
             .unwrap_or("")
             .to_string();
 
-        if let Some(language) = self.languages.get(&ext) {
+        let language = match ext.as_str() {
+            "py" => Some(&self.python_config),
+            "js" => Some(&self.javascript_config),
+            "ts" => Some(&self.typescript_config),
+            "java" => Some(&self.java_config),
+            _ => None,
+        };
+
+        if let Some(language) = language {
             let globals = Variables::new();
             // Parse and add to graph immediately
             language
