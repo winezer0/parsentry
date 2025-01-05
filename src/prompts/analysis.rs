@@ -3,35 +3,35 @@ use std::collections::HashMap;
 
 pub const README_SUMMARY_PROMPT_TEMPLATE: &str = r#"
 Analyze the provided README content and create a concise summary that captures:
-1. The project's main purpose and functionality
-2. Key features and capabilities
-3. Important technical details or requirements
-4. Any security-related information
+- The project's main purpose and functionality
+- Key features and capabilities
+- Important technical details or requirements
+- Any security-related information
 
 Format your response within <summary></summary> tags.
 "#;
 
 pub const SYS_PROMPT_TEMPLATE: &str = r#"
 You are a security researcher analyzing code for potential vulnerabilities. Focus on:
-1. Input validation and sanitization
-2. Authentication and authorization
-3. Data handling and exposure
-4. Command injection possibilities
-5. Path traversal vulnerabilities
-6. Other security-critical patterns
+- Input validation and sanitization
+- Authentication and authorization
+- Data handling and exposure
+- Command injection possibilities
+- Path traversal vulnerabilities
+- Other security-critical patterns
 
 Consider the project context from the README summary below when analyzing the code.
 "#;
 
 pub const INITIAL_ANALYSIS_PROMPT_TEMPLATE: &str = r#"
 Analyze the provided code for potential security vulnerabilities. Consider:
-1. User input handling and validation
-2. Authentication and authorization mechanisms
-3. Data sanitization and escaping
-4. File system operations
-5. Network requests and responses
-6. Command execution
-7. Database queries
+- User input handling and validation
+- Authentication and authorization mechanisms
+- Data sanitization and escaping
+- File system operations
+- Network requests and responses
+- Command execution
+- Database queries
 
 Provide your analysis in a structured format with:
 - Step-by-step analysis process

@@ -8,10 +8,10 @@ use std::process::Command;
 fn init_db() -> SqliteResult<()> {
     let conn = Connection::open("users.db")?;
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL
+        "CREATE TABLE IF NOT EXISTS users ( \
+            id INTEGER PRIMARY KEY, \
+            username TEXT NOT NULL, \
+            password TEXT NOT NULL \
         )",
         [],
     )?;

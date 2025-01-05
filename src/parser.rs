@@ -15,12 +15,6 @@ pub struct StackGraphsError {
     message: String,
 }
 
-impl StackGraphsError {
-    pub fn from(message: String) -> StackGraphsError {
-        StackGraphsError { message }
-    }
-}
-
 impl fmt::Display for StackGraphsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.message)
@@ -103,11 +97,12 @@ impl CodeParser {
         let mut java_configs = get_language_configurations("java");
 
         let db_writer = if let Some(path) = db_path {
-            SQLiteWriter::open(path)
-                .map_err(|e| StackGraphsError::from(format!("Failed to open database: {}", e)))?
+            SQLiteWriter::open(path).map_err(|e| StackGraphsError {
+                message: format!("Failed to open database: {}", e),
+            })?
         } else {
-            SQLiteWriter::open_in_memory().map_err(|e| {
-                StackGraphsError::from(format!("Failed to create in-memory database: {}", e))
+            SQLiteWriter::open_in_memory().map_err(|e| StackGraphsError {
+                message: format!("Failed to create in-memory database: {}", e),
             })?
         };
 
@@ -123,8 +118,9 @@ impl CodeParser {
     }
 
     pub fn add_file(&mut self, path: &Path) -> Result<(), StackGraphsError> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| StackGraphsError::from(format!("Failed to read file: {}", e)))?;
+        let content = std::fs::read_to_string(path).map_err(|e| StackGraphsError {
+            message: format!("Failed to read file: {}", e),
+        })?;
 
         // Add file to graph
         let file_path = path.to_string_lossy().to_string();
@@ -158,8 +154,8 @@ impl CodeParser {
                     &globals,
                     &NoCancellation,
                 )
-                .map_err(|e| {
-                    StackGraphsError::from(format!("Failed to build stack graph: {}", e))
+                .map_err(|e| StackGraphsError {
+                    message: format!("Failed to build stack graph: {}", e),
                 })?;
         }
 
@@ -167,7 +163,6 @@ impl CodeParser {
     }
 
     pub fn find_references(&self, name: &str) -> Vec<(PathBuf, Definition)> {
-        use stack_graphs::graph::Node;
         let mut results = Vec::new();
         let mut seen_positions = std::collections::HashSet::new();
 
@@ -187,20 +182,17 @@ impl CodeParser {
                     in_import = false;
                 }
 
-                // 関数定義行をスキップ
                 if line_trimmed.starts_with("def ") || line_trimmed.starts_with("function ") {
                     line_number += 1;
                     continue;
                 }
 
-                // インポート文をスキップ
                 if in_import {
                     line_number += 1;
                     continue;
                 }
 
                 if let Some(pos) = line.find(name) {
-                    // 変数代入や関数呼び出しの一部であることを確認
                     let before_name = &line[..pos];
                     let is_reference = before_name.ends_with(" = ")
                         || before_name.ends_with("(")
@@ -214,13 +206,6 @@ impl CodeParser {
                         let position = (file_path.clone(), start_byte, end_byte);
                         if !seen_positions.contains(&position) {
                             seen_positions.insert(position.clone());
-                            println!(
-                                "Found reference: {} at line {}, pos {}:{}",
-                                line,
-                                line_number + 1,
-                                start_byte,
-                                end_byte
-                            );
                             results.push((
                                 file_path.clone(),
                                 Definition {
@@ -252,7 +237,9 @@ impl CodeParser {
         let content = self
             .files
             .get(source_file)
-            .ok_or_else(|| StackGraphsError::from("File not found in parser".to_string()))?;
+            .ok_or_else(|| StackGraphsError {
+                message: "File not found in parser".to_string(),
+            })?;
 
         Ok(self.graph.iter_nodes().find_map(|handle| {
             let node = &self.graph[handle];
@@ -295,24 +282,20 @@ mod tests {
     fn test_find_definition() -> Result<(), StackGraphsError> {
         let mut parser = CodeParser::new(None)?;
 
-        // Create a temporary Python file with a function definition
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("test.py");
         std::fs::write(&file_path, "def test_function():\n    pass\n").unwrap();
 
-        // Add and parse file
         parser.add_file(&file_path)?;
 
-        // Test finding the definition
         let result = parser.find_definition("test_function", &file_path)?;
         assert!(result.is_some());
 
         let (path, def) = result.unwrap();
         assert_eq!(path, file_path);
         assert_eq!(def.name, "test_function");
-        assert_eq!(def.source, "test_function"); // シンボル名のみをテスト
+        assert_eq!(def.source, "test_function");
 
-        // Test finding non-existent definition
         let result = parser.find_definition("non_existent", &file_path)?;
         assert!(result.is_none());
 
@@ -324,17 +307,14 @@ mod tests {
         let mut parser = CodeParser::new(None)?;
         let temp_dir = tempfile::tempdir().unwrap();
 
-        // Create Python files with function definition and references
         let file_path1 = temp_dir.path().join("main.py");
         std::fs::write(
             &file_path1,
             r#"def test_function():
     return "Hello"
 
-# Reference 1
 x = test_function
 
-# Reference 2
 if True:
     y = test_function"#,
         )
@@ -345,21 +325,17 @@ if True:
             &file_path2,
             r#"from main import test_function
 
-# Reference 3
 def another_function():
     z = test_function"#,
         )
         .unwrap();
 
-        // Add and parse files
         parser.add_file(&file_path1)?;
         parser.add_file(&file_path2)?;
 
-        // Test finding references
         let references = parser.find_references("test_function");
         assert_eq!(references.len(), 3, "Expected exactly 3 references");
 
-        // 各参照の検証
         let main_refs: Vec<_> = references
             .iter()
             .filter(|(path, _)| path == &file_path1)
@@ -372,17 +348,14 @@ def another_function():
         assert_eq!(main_refs.len(), 2, "Expected 2 references in main.py");
         assert_eq!(test_refs.len(), 1, "Expected 1 reference in test.py");
 
-        // 参照のソースコードを検証
         for (_, def) in references {
             assert_eq!(def.name, "test_function");
             assert_eq!(def.source, "test_function");
         }
 
-        // Test finding non-existent references
         let references = parser.find_references("non_existent");
         assert!(references.is_empty());
 
-        // Test JavaScript references
         let js_file = temp_dir.path().join("test.js");
         std::fs::write(
             &js_file,
@@ -390,10 +363,8 @@ def another_function():
     return true;
 }
 
-// Reference 1
 let x = testFunction();
 
-// Reference 2
 if (true) {
     let y = testFunction();
 }"#,
@@ -419,26 +390,21 @@ if (true) {
 
     #[test]
     fn test_index_files() -> Result<(), anyhow::Error> {
-        // Create temporary directory and files
         let temp_dir = TempDir::new()?;
         let python_file = temp_dir.path().join("test.py");
         let js_file = temp_dir.path().join("test.js");
 
-        // Write test content
         std::fs::write(&python_file, "def test_function():\n    pass\n")?;
         std::fs::write(&js_file, "function testFunction() {\n    return true;\n}")?;
 
-        // Test Python indexing
         let result = index_files(vec![python_file.clone()], "python");
         assert!(result.is_ok());
 
-        // Test JavaScript indexing
         let result = index_files(vec![js_file.clone()], "javascript");
         assert!(result.is_ok());
 
-        // Test invalid language
         let result = index_files(vec![python_file], "invalid");
-        assert!(result.is_ok()); // Should succeed with empty language configurations
+        assert!(result.is_ok());
 
         Ok(())
     }

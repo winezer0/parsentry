@@ -1,13 +1,50 @@
 use anyhow::{Error, Result};
 use genai::chat::{ChatMessage, ChatOptions, ChatRequest, JsonSpec};
 use genai::{Client, ClientConfig};
-use log::info;
+use log::{debug, error, info, warn};
 use regex::escape;
+use serde::de::DeserializeOwned;
 use std::path::PathBuf;
 
 use crate::parser::CodeParser;
 use crate::prompts::{self, vuln_specific};
 use crate::response::{response_json_schema, Response};
+
+fn create_api_client() -> Client {
+    let client_config = ClientConfig::default().with_chat_options(
+        ChatOptions::default()
+            .with_response_format(JsonSpec::new("schema", response_json_schema())),
+    );
+    Client::builder().with_config(client_config).build()
+}
+
+async fn execute_chat_request(
+    client: &Client,
+    model: &str,
+    chat_req: ChatRequest,
+) -> Result<String> {
+    let chat_res = client.exec_chat(model, chat_req, None).await?;
+    match chat_res.content_text_as_str() {
+        Some(content) => Ok(content.to_string()),
+        None => {
+            error!("Failed to get content text from chat response");
+            Err(anyhow::anyhow!(
+                "Failed to get content text from chat response"
+            ))
+        }
+    }
+}
+
+fn parse_json_response<T: DeserializeOwned>(chat_content: &str) -> Result<T> {
+    match serde_json::from_str(chat_content) {
+        Ok(response) => Ok(response),
+        Err(e) => {
+            debug!("Failed to parse JSON response: {}", e);
+            debug!("Response content: {}", chat_content);
+            Err(anyhow::anyhow!("Failed to parse JSON response: {}", e))
+        }
+    }
+}
 
 pub async fn analyze_file(
     file_path: &PathBuf,
@@ -17,10 +54,8 @@ pub async fn analyze_file(
 ) -> Result<Response, Error> {
     info!("Performing initial analysis of {}", file_path.display());
 
-    // Initialize parser
     let mut parser = CodeParser::new(None)?;
 
-    // Add all files to the parser for cross-reference analysis
     for file in files {
         parser.add_file(file)?;
     }
@@ -51,33 +86,12 @@ pub async fn analyze_file(
         ChatMessage::user(&prompt),
     ]);
 
-    let client_config = ClientConfig::default().with_chat_options(
-        ChatOptions::default()
-            .with_response_format(JsonSpec::new("schema", response_json_schema())),
-    );
-    let json_client = Client::builder().with_config(client_config).build();
-    let chat_res = json_client.exec_chat(model, chat_req, None).await?;
-    let chat_content = match chat_res.content_text_as_str() {
-        Some(content) => content,
-        None => {
-            log::error!("Failed to get content text from chat response");
-            return Err(anyhow::anyhow!(
-                "Failed to get content text from chat response"
-            ));
-        }
-    };
+    let json_client = create_api_client();
+    let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
+    let response: Response = parse_json_response(&chat_content)?;
 
-    let response: Response = match serde_json::from_str(chat_content) {
-        Ok(response) => response,
-        Err(e) => {
-            log::debug!("Failed to parse JSON response: {}", e);
-            log::debug!("Response content: {}", chat_content);
-            return Err(anyhow::anyhow!("Failed to parse JSON response: {}", e));
-        }
-    };
     info!("Initial analysis complete");
 
-    // Secondary analysis for each vulnerability type
     if response.confidence_score > 0 && !response.vulnerability_types.is_empty() {
         let vuln_info_map = vuln_specific::get_vuln_specific_info();
 
@@ -121,25 +135,9 @@ pub async fn analyze_file(
                     ChatMessage::user(&prompt),
                 ]);
 
-                let chat_res = json_client.exec_chat(model, chat_req, None).await?;
-                let chat_content = match chat_res.content_text_as_str() {
-                    Some(content) => content,
-                    None => {
-                        log::error!("Failed to get content text from chat response");
-                        return Err(anyhow::anyhow!(
-                            "Failed to get content text from chat response"
-                        ));
-                    }
-                };
-
-                let vuln_response: Response = match serde_json::from_str(chat_content) {
-                    Ok(response) => response,
-                    Err(e) => {
-                        log::debug!("Failed to parse JSON response: {}", e);
-                        log::debug!("Response content: {}", chat_content);
-                        return Err(anyhow::anyhow!("Failed to parse JSON response: {}", e));
-                    }
-                };
+                let json_client = create_api_client();
+                let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
+                let vuln_response: Response = parse_json_response(&chat_content)?;
 
                 if verbosity > 0 {
                     return Ok(vuln_response);
@@ -152,7 +150,6 @@ pub async fn analyze_file(
                     break;
                 }
 
-                // Extract new context code using Parser
                 for context in vuln_response.context_code {
                     let escaped_name = escape(&context.name);
                     if !stored_code_definitions
@@ -164,14 +161,13 @@ pub async fn analyze_file(
                                 stored_code_definitions.push(def);
                             }
                             Ok(None) => {
-                                log::warn!("No definition found for context: {}", escaped_name);
+                                warn!("No definition found for context: {}", escaped_name);
                                 continue;
                             }
                             Err(e) => {
-                                log::warn!(
+                                warn!(
                                     "Failed to extract code definition for context {}: {}",
-                                    escaped_name,
-                                    e
+                                    escaped_name, e
                                 );
                                 continue;
                             }
@@ -200,7 +196,6 @@ mod tests {
     #[cfg(feature = "snapshot-test")]
     #[tokio::test]
     async fn test_analyze_empty_file() -> Result<()> {
-        // 空のファイルを作成
         let temp_file = NamedTempFile::new()?;
 
         let result = analyze_file(
@@ -211,7 +206,6 @@ mod tests {
         )
         .await?;
 
-        // 空のファイルの場合のレスポンスを検証
         assert_eq!(result.scratchpad, String::new());
         assert_eq!(result.analysis, String::new());
         assert_eq!(result.poc, String::new());
@@ -225,7 +219,6 @@ mod tests {
     #[cfg(feature = "snapshot-test")]
     #[tokio::test]
     async fn test_analyze_hardcoded_password() -> Result<()> {
-        // 脆弱性を含むコードファイルを作成
         let temp_file = NamedTempFile::new()?;
         std::fs::write(
             temp_file.path(),
@@ -245,7 +238,6 @@ fn main() {
         )
         .await?;
 
-        // レスポンスの構造を検証
         assert!(!result.analysis.is_empty(), "Analysis should not be empty");
         assert!(
             result.confidence_score > 0,
@@ -266,7 +258,6 @@ fn main() {
     #[cfg(feature = "snapshot-test")]
     #[tokio::test]
     async fn test_analyze_authentication_function() -> Result<()> {
-        // コンテキストを含むコードファイルを作成
         let temp_file = NamedTempFile::new()?;
         std::fs::write(
             temp_file.path(),
@@ -293,7 +284,6 @@ fn main() {
         )
         .await?;
 
-        // レスポンスの構造を検証
         assert!(!result.analysis.is_empty(), "Analysis should not be empty");
         assert!(
             result.confidence_score > 0,
