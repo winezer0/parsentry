@@ -6,6 +6,9 @@ edition = "2021"
 [build-dependencies]
 cc = "1.0"
 
+[features]
+snapshot-test = []
+
 [dependencies]
 tree-sitter = "0.24"
 stack-graphs = { version = "0.14", features = ["storage"] }
@@ -28,5 +31,9 @@ dotenv = "0.15"
 genai = "0.1.15"
 
 [dev-dependencies]
+insta = { version = "1.42.0", features = ["yaml"] }
 tempfile = "3.10"
 tokio-test = "0.4"
+
+[workspace.metadata.insta]
+snapshot-path = "snapshots"

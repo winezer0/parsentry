@@ -1,0 +1,14 @@
+---
+source: src/analyzer_test.rs
+expression: response
+---
+scratchpad: The Rust program defines a simple main function that holds a hardcoded password variable.
+analysis: The primary security issue identified is the use of a hardcoded password.
+poc: To exploit this vulnerability an attacker could gain access to the source code.
+confidence_score: 80
+vulnerability_types:
+  - AFO
+context_code:
+  - name: main function
+    reason: The function contains a hardcoded password
+    code_line: "let password = \"hardcoded_password\";"

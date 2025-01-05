@@ -190,3 +190,124 @@ pub async fn analyze_file(
 
     Ok(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::response::{ContextCode, VulnType};
+    use tempfile::NamedTempFile;
+
+    #[cfg(feature = "snapshot-test")]
+    #[tokio::test]
+    async fn test_analyze_empty_file() -> Result<()> {
+        // 空のファイルを作成
+        let temp_file = NamedTempFile::new()?;
+
+        let result = analyze_file(
+            &PathBuf::from(temp_file.path()),
+            "gpt-4o-mini",
+            &[PathBuf::from(temp_file.path())],
+            0,
+        )
+        .await?;
+
+        // 空のファイルの場合のレスポンスを検証
+        assert_eq!(result.scratchpad, String::new());
+        assert_eq!(result.analysis, String::new());
+        assert_eq!(result.poc, String::new());
+        assert_eq!(result.confidence_score, 0);
+        assert!(result.vulnerability_types.is_empty());
+        assert!(result.context_code.is_empty());
+
+        Ok(())
+    }
+
+    #[cfg(feature = "snapshot-test")]
+    #[tokio::test]
+    async fn test_analyze_hardcoded_password() -> Result<()> {
+        // 脆弱性を含むコードファイルを作成
+        let temp_file = NamedTempFile::new()?;
+        std::fs::write(
+            temp_file.path(),
+            r#"
+fn main() {
+    let password = "hardcoded_password";
+    println!("{}", password);
+}
+"#,
+        )?;
+
+        let result = analyze_file(
+            &PathBuf::from(temp_file.path()),
+            "gpt-4o-mini",
+            &[PathBuf::from(temp_file.path())],
+            0,
+        )
+        .await?;
+
+        // レスポンスの構造を検証
+        assert!(!result.analysis.is_empty(), "Analysis should not be empty");
+        assert!(
+            result.confidence_score > 0,
+            "Confidence score should be positive"
+        );
+        assert!(
+            !result.vulnerability_types.is_empty(),
+            "Should detect vulnerabilities"
+        );
+        assert!(
+            !result.context_code.is_empty(),
+            "Should include context code"
+        );
+
+        Ok(())
+    }
+
+    #[cfg(feature = "snapshot-test")]
+    #[tokio::test]
+    async fn test_analyze_authentication_function() -> Result<()> {
+        // コンテキストを含むコードファイルを作成
+        let temp_file = NamedTempFile::new()?;
+        std::fs::write(
+            temp_file.path(),
+            r#"
+fn authenticate(input: &str) -> bool {
+    let password = "hardcoded_password";
+    input == password
+}
+
+fn main() {
+    let user_input = "test";
+    if authenticate(user_input) {
+        println!("Authenticated!");
+    }
+}
+"#,
+        )?;
+
+        let result = analyze_file(
+            &PathBuf::from(temp_file.path()),
+            "gpt-4o-mini",
+            &[PathBuf::from(temp_file.path())],
+            0,
+        )
+        .await?;
+
+        // レスポンスの構造を検証
+        assert!(!result.analysis.is_empty(), "Analysis should not be empty");
+        assert!(
+            result.confidence_score > 0,
+            "Confidence score should be positive"
+        );
+        assert!(
+            !result.vulnerability_types.is_empty(),
+            "Should detect vulnerabilities"
+        );
+        assert!(
+            !result.context_code.is_empty(),
+            "Should include context code"
+        );
+
+        Ok(())
+    }
+}
