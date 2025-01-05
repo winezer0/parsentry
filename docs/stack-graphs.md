@@ -1,10 +1,10 @@
 # Stack Graphs
 
-Stack Graphsは、programming languageのname resolution rulesを効率的に定義・実装するためのframeworkです。このドキュメントでは、Stack Graphsの基本概念と実際の使用方法について説明します。
+Stack Graphsは、プログラミング言語の名前解決 rulesを効率的に定義・実装するためのframeworkです。このドキュメントでは、Stack Graphsの基本概念と実際の使用方法について説明します。
 
 ## Core Concepts
 
-Stack Graphsは、name bindingをgraphとして表現し、path探索によってname resolutionを実現します。
+Stack Graphsは、name bindingをgraphとして表現し、path探索によって名前解決を実現します。
 
 ### Name Binding Structure
 
@@ -13,7 +13,7 @@ Stack Graphsは、name bindingをgraphとして表現し、path探索によっ�
   - 各bindingは可能な定義へのpathとして表現
 
 - **Path Resolution**
-  - Graphのpath探索によってname resolutionを実行
+  - Graphのpath探索によって名前解決
   - Incremental stack graphによる効率的な探索
 
 ### Stack System
@@ -45,7 +45,7 @@ Stack Graphsは、name bindingをgraphとして表現し、path探索によっ�
 Stack GraphsはScope Graphsを拡張したframeworkです：
 
 1. **Enhanced Resolution**
-   - Stack-based name resolution
+   - Stack-based 名前解決
    - より柔軟なbinding rule
    - Cross-language resolution support
 
@@ -102,7 +102,7 @@ language.sgl.build_stack_graph_into(
    SQLiteWriter::open(path)
    ```
 
-### Name Resolution
+### 名前解決
 
 1. **Definition Finding**
    ```rust
