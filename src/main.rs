@@ -21,8 +21,8 @@ struct Args {
     #[arg(short, long)]
     analyze: Option<PathBuf>,
 
-    /// LLM model to use (default: claude-3-haiku-20240307)
-    #[arg(short, long, default_value = "claude-3-haiku-20240307")]
+    /// LLM model to use (default: gpt-4o-2024-08-06)
+    #[arg(short, long, default_value = "gpt-4o-2024-08-06")]
     model: String,
 
     /// Increase output verbosity

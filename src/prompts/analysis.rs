@@ -20,6 +20,22 @@ You are a security researcher analyzing code for potential vulnerabilities. Focu
 - Path traversal vulnerabilities
 - Other security-critical patterns
 
+Your response must be in the following JSON format:
+{
+    "scratchpad": "Your working notes and thoughts",
+    "analysis": "Detailed security analysis",
+    "poc": "Proof of concept or exploitation steps",
+    "confidence_score": 0-100,
+    "vulnerability_types": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"],
+    "context_code": [
+        {
+            "name": "function_or_block_name",
+            "reason": "why this code is relevant",
+            "code_line": "the specific line of code"
+        }
+    ]
+}
+
 Consider the project context from the README summary below when analyzing the code.
 "#;
 
@@ -33,11 +49,23 @@ Analyze the provided code for potential security vulnerabilities. Consider:
 - Command execution
 - Database queries
 
-Provide your analysis in a structured format with:
-- Step-by-step analysis process
-- Identified vulnerabilities
-- Confidence level
-- Supporting code context
+Your response must strictly follow this JSON format:
+{
+    "scratchpad": "Your step-by-step analysis process and working notes",
+    "analysis": "Detailed findings and vulnerability explanations",
+    "poc": "Concrete proof of concept or exploitation steps",
+    "confidence_score": 0-100,
+    "vulnerability_types": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"],
+    "context_code": [
+        {
+            "name": "function_or_block_name",
+            "reason": "why this code is relevant to the vulnerability",
+            "code_line": "the specific vulnerable line of code"
+        }
+    ]
+}
+
+Note: vulnerability_types must be one or more of the exact values shown above.
 "#;
 
 pub const ANALYSIS_APPROACH_TEMPLATE: &str = r#"
