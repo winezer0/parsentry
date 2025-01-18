@@ -39,24 +39,19 @@ vulnhuntrs -r <path-to-project>
 
 The repository includes example vulnerable applications to demonstrate the tool's capabilities:
 
-- Python app(`example/python-vulnerable-app`)+ Claude 3.5 Sonnet 20241022
-```bash
-export ANTHROPIC_API_KEY=your-api-key
-cargo run -- -r example/python-vulnerable-app
-```
-
-- Rust app(`example/rust-vulnerable-app`) + GPT-4o-latest
+- Python app(`example/python-vulnerable-app`) + gpt-4o-0806
 ```bash
 export OPENAI_API_KEY=your-api-key
-cargo run -- -r example/rust-vulnerable-app -m gpt-4o
+cargo run -- -r example/python-vulnerable-app 
+```
+
+- Rust app(`example/rust-vulnerable-app`) + gpt-4o-mini
+```bash
+export OPENAI_API_KEY=your-api-key
+cargo run -- -r example/rust-vulnerable-app -m gpt-4o-mini
 ```
 
 These examples are for educational purposes only. Do not use them in production environments.
-
-## Documentation
-
-- See [DEVELOPMENT.md](DEVELOPMENT.md) for development guidelines and contributing information
-- Check the `example/` directory for sample vulnerable applications
 
 ## Security
 
