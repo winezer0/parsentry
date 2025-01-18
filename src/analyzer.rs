@@ -82,7 +82,7 @@ pub async fn analyze_file(
     );
 
     let chat_req = ChatRequest::new(vec![
-        ChatMessage::system("You are a security vulnerability analyzer. Reply in JSON format"),
+        ChatMessage::system("You are a security vulnerability analyzer. You must reply with exactly one JSON object that matches this schema: { \"scratchpad\": string, \"analysis\": string, \"poc\": string, \"confidence_score\": integer, \"vulnerability_types\": array of strings, \"context_code\": array of objects with { \"name\": string, \"reason\": string, \"code_line\": string } }. Do not include any explanatory text outside the JSON object."),
         ChatMessage::user(&prompt),
     ]);
 
@@ -130,7 +130,7 @@ pub async fn analyze_file(
 
                 let chat_req = ChatRequest::new(vec![
                     ChatMessage::system(
-                        "You are a security vulnerability analyzer. Reply in JSON format",
+                        "You are a security vulnerability analyzer. You must reply with exactly one JSON object that matches this schema: { \"scratchpad\": string, \"analysis\": string, \"poc\": string, \"confidence_score\": integer, \"vulnerability_types\": array of strings, \"context_code\": array of objects with { \"name\": string, \"reason\": string, \"code_line\": string } }. Do not include any explanatory text outside the JSON object.",
                     ),
                     ChatMessage::user(&prompt),
                 ]);
