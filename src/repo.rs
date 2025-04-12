@@ -41,7 +41,15 @@ impl RepoOps {
             "java".to_string(),
         ];
 
-        let security_patterns = Some(SecurityRiskPatterns::new());
+        let security_patterns = Some(SecurityRiskPatterns::new(
+            crate::security_patterns::Language::Other,
+        ));
+        let security_patterns = Some(SecurityRiskPatterns::new(
+            crate::security_patterns::Language::Other,
+        ));
+        let security_patterns = Some(SecurityRiskPatterns::new(
+            crate::security_patterns::Language::Other,
+        ));
 
         Self {
             repo_path,

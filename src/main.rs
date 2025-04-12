@@ -3,6 +3,7 @@ use clap::Parser;
 use dotenv::dotenv;
 use std::path::PathBuf;
 use vulnhuntrs::analyzer::analyze_file;
+use vulnhuntrs::security_patterns::Language;
 use vulnhuntrs::security_patterns::SecurityRiskPatterns;
 
 use vulnhuntrs::repo::RepoOps;
@@ -18,8 +19,8 @@ struct Args {
     #[arg(short, long)]
     analyze: Option<PathBuf>,
 
-    /// LLM model to use (default: gpt-4o-2024-08-06)
-    #[arg(short, long, default_value = "gpt-4o-2024-08-06")]
+    /// LLM model to use (default: o3-mini)
+    #[arg(short, long, default_value = "o3-mini")]
     model: String,
 
     /// Increase output verbosity
@@ -52,7 +53,7 @@ async fn main() -> Result<()> {
     }
 
     // SecurityRiskPatternsで該当ファイルを特定
-    let patterns = SecurityRiskPatterns::new();
+    let patterns = SecurityRiskPatterns::new(Language::Other);
     let mut pattern_files = Vec::new();
     for file_path in &files {
         if let Ok(content) = std::fs::read_to_string(file_path) {
