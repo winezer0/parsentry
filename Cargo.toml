@@ -13,7 +13,7 @@ snapshot-test = []
 tree-sitter = "0.24.6"
 streaming-iterator = "0.1"
 tree-sitter-typescript = { version = "0.20" }
-tokio = { version = "1.36", features = ["full", "test-util", "macros"] }
+tokio = { version = "1.43", features = ["full", "test-util", "macros"] }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
