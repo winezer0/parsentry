@@ -240,7 +240,7 @@ pub async fn analyze_file(
             poc: String::new(),
             confidence_score: 0,
             vulnerability_types: vec![],
-            context_code: vec![],
+            context_code: Vec::new(),
         });
     }
     Ok(response)
@@ -252,14 +252,47 @@ pub async fn analyze_file_with_context(
     model: &str,
     verbosity: u8,
 ) -> Result<Response, Error> {
-    // TODO: context.definitionsを使ってパターンごとに解析し、Responseを作成
+    // context.definitionsから脆弱性パターンに該当する定義を抽出し、Responseを作成
+    let mut analysis = String::new();
+    let mut context_code = Vec::new();
+    let mut vuln_types = Vec::new();
+
+    for def in &context.definitions {
+        // 簡易的にパターン判定（例: パスワードや認証、ネットワーク操作などのキーワードを含むか）
+        if def.source.contains("password") || def.source.contains("auth") {
+            analysis.push_str(&format!(
+                "関数'{}'は認証・パスワード操作を含みます。\n",
+                def.name
+            ));
+            vuln_types.push(crate::response::VulnType::Other("Auth".to_string()));
+            context_code.push(crate::response::ContextCode {
+                name: def.name.clone(),
+                reason: "認証・パスワード操作を含む".to_string(),
+                code_line: def.source.clone(),
+            });
+        } else if def.source.contains("fetch") || def.source.contains("axios") {
+            analysis.push_str(&format!("関数'{}'は外部リクエストを含みます。\n", def.name));
+            vuln_types.push(crate::response::VulnType::Other("Network".to_string()));
+            context_code.push(crate::response::ContextCode {
+                name: def.name.clone(),
+                reason: "外部リクエストを含む".to_string(),
+                code_line: def.source.clone(),
+            });
+        }
+        // 他のパターンも必要に応じて追加
+    }
+
+    if analysis.is_empty() {
+        analysis = "脆弱性パターンに該当する定義は見つかりませんでした。".to_string();
+    }
+
     Ok(Response {
-        scratchpad: String::new(),
-        analysis: String::new(),
+        scratchpad: String::from("context.definitionsベースの自動解析"),
+        analysis,
         poc: String::new(),
-        confidence_score: 0,
-        vulnerability_types: vec![],
-        context_code: vec![],
+        confidence_score: if vuln_types.is_empty() { 0 } else { 80 },
+        vulnerability_types: vuln_types,
+        context_code: context_code,
     })
 }
 

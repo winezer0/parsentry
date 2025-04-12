@@ -5,6 +5,8 @@ use genai::chat::{ChatMessage, ChatRequest};
 use genai::Client;
 use log::{info, warn};
 use std::path::PathBuf;
+use vulnhuntrs::analyzer::analyze_file_with_context;
+use vulnhuntrs::security_patterns::SecurityRiskPatterns;
 
 use vulnhuntrs::analyzer::analyze_file;
 use vulnhuntrs::prompts::SYS_PROMPT_TEMPLATE;
@@ -41,7 +43,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     let args = Args::parse();
-    let repo = RepoOps::new(args.root.clone());
+    let mut repo = RepoOps::new(args.root.clone());
 
     println!("🔍 Vulnhuntrs - セキュリティ解析ツール");
 
@@ -54,16 +56,27 @@ async fn main() -> Result<()> {
         println!("  [{}] {}", i + 1, f.display());
     }
 
-    let files_to_analyze = if let Some(analyze_path) = args.analyze {
-        repo.get_files_to_analyze(Some(analyze_path))?
-    } else {
-        repo.get_network_related_files(&files)
-    };
+    // SecurityRiskPatternsで該当ファイルを特定
+    let patterns = SecurityRiskPatterns::new();
+    let mut pattern_files = Vec::new();
+    for file_path in &files {
+        if let Ok(content) = std::fs::read_to_string(file_path) {
+            if patterns.matches(&content) {
+                pattern_files.push(file_path.clone());
+            }
+        }
+    }
 
-    let client = Client::default();
+    println!(
+        "🔎 セキュリティパターン該当ファイルを検出しました ({}件)",
+        pattern_files.len()
+    );
+    for (i, f) in pattern_files.iter().enumerate() {
+        println!("  [P{}] {}", i + 1, f.display());
+    }
 
-    let total = files_to_analyze.len();
-    for (idx, file_path) in files_to_analyze.iter().enumerate() {
+    let total = pattern_files.len();
+    for (idx, file_path) in pattern_files.iter().enumerate() {
         let file_name = file_path.display().to_string();
         if idx > 0 {
             println!();
@@ -71,7 +84,13 @@ async fn main() -> Result<()> {
         println!("📄 解析対象: {} ({} / {})", file_name, idx + 1, total);
         println!("{}", "=".repeat(80));
 
-        let analysis_result = analyze_file(file_path, &args.model, &files, args.verbosity).await?;
+        // 関連定義をまとめたContextを構築
+        repo.add_file_to_parser(file_path)?;
+        let context = repo.collect_context_for_security_pattern(file_path)?;
+
+        // analyze_file_with_contextで解析
+        let analysis_result =
+            analyze_file_with_context(&context, &args.model, args.verbosity).await?;
 
         analysis_result.print_readable();
     }

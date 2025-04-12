@@ -250,7 +250,10 @@ impl RepoOps {
         if !self.parser_initialized {
             self.parse_repo_files(None)?;
         }
-
         self.code_parser.find_references(name)
+    }
+    /// 指定ファイルをCodeParserに追加
+    pub fn add_file_to_parser(&mut self, path: &std::path::Path) -> anyhow::Result<()> {
+        self.code_parser.add_file(path)
     }
 }

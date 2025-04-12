@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
+extern "C" {
+    fn tree_sitter_rust() -> tree_sitter::Language;
+}
 use tree_sitter::{Language, Node, Parser, Query, QueryCursor};
 
 extern "C" {
@@ -62,6 +65,7 @@ impl CodeParser {
             Some("ts") => Some(unsafe { tree_sitter_typescript() }),
             Some("tsx") => Some(unsafe { tree_sitter_tsx() }),
             Some("java") => Some(unsafe { tree_sitter_java() }),
+            Some("rs") => Some(unsafe { tree_sitter_rust() }),
             _ => None,
         }
     }
@@ -78,6 +82,8 @@ impl CodeParser {
             "typescript"
         } else if language == &unsafe { tree_sitter_java() } {
             "java"
+        } else if language == &unsafe { tree_sitter_rust() } {
+            "rust"
         } else {
             return Err(anyhow!("クエリに対応していない言語です"));
         };
@@ -277,9 +283,84 @@ impl CodeParser {
     }
     /// 指定ファイルから関連定義を再帰的に収集しContextを構築する。
     pub fn build_context_from_file(&mut self, start_path: &Path) -> Result<Context> {
-        // TODO: 定義収集ロジック実装
-        Ok(Context {
-            definitions: vec![],
-        })
+        use std::collections::HashSet;
+
+        // 収集済み定義名を管理
+        let mut collected: HashSet<String> = HashSet::new();
+        let mut definitions: Vec<Definition> = Vec::new();
+
+        // 起点ファイルの全定義を抽出
+        let file_content = self
+            .files
+            .get(start_path)
+            .ok_or_else(|| anyhow::anyhow!("ファイルが見つかりません: {}", start_path.display()))?;
+        let language = self
+            .get_language(start_path)
+            .ok_or_else(|| anyhow::anyhow!("言語が特定できません: {}", start_path.display()))?;
+        self.parser
+            .set_language(&language)
+            .map_err(|e| anyhow::anyhow!("言語の設定に失敗: {}", e))?;
+        let tree = self
+            .parser
+            .parse(file_content, None)
+            .ok_or_else(|| anyhow::anyhow!("パース失敗: {}", start_path.display()))?;
+
+        // definitionsクエリで全定義を抽出
+        let query_path = self.get_query_path(&language, "definitions")?;
+        let query_str = std::fs::read_to_string(&query_path)?;
+        let query = tree_sitter::Query::new(&language, &query_str)?;
+
+        let mut query_cursor = tree_sitter::QueryCursor::new();
+        let mut matches = query_cursor.matches(&query, tree.root_node(), file_content.as_bytes());
+
+        // 定義名リスト
+        let mut to_visit: Vec<(PathBuf, String)> = Vec::new();
+
+        while let Some(mat) = matches.next() {
+            let mut def_node: Option<tree_sitter::Node> = None;
+            let mut name_node: Option<tree_sitter::Node> = None;
+            for cap in mat.captures {
+                let capture_name = &query.capture_names()[cap.index as usize];
+                match &capture_name[..] {
+                    "definition" => def_node = Some(cap.node),
+                    "name" => name_node = Some(cap.node),
+                    _ => {}
+                }
+            }
+            if let (Some(def_node), Some(name_node)) = (def_node, name_node) {
+                let name = name_node.utf8_text(file_content.as_bytes())?.to_string();
+                if !collected.contains(&name) {
+                    let start_byte = def_node.start_byte();
+                    let end_byte = def_node.end_byte();
+                    let source = def_node.utf8_text(file_content.as_bytes())?.to_string();
+                    definitions.push(Definition {
+                        name: name.clone(),
+                        start_byte,
+                        end_byte,
+                        source,
+                    });
+                    collected.insert(name.clone());
+                    to_visit.push((start_path.to_path_buf(), name));
+                }
+            }
+        }
+
+        // 再帰的に呼び出し先定義を収集
+        while let Some((file_path, func_name)) = to_visit.pop() {
+            // 関数本体から呼び出し先関数名を抽出（referencesクエリを利用）
+            if let Some((_, def)) = self.find_definition(&func_name, &file_path)? {
+                // referencesクエリで呼び出し先を抽出
+                let refs = self.find_references(&def.name)?;
+                for (ref_file, ref_def) in refs {
+                    if !collected.contains(&ref_def.name) {
+                        definitions.push(ref_def.clone());
+                        collected.insert(ref_def.name.clone());
+                        to_visit.push((ref_file, ref_def.name.clone()));
+                    }
+                }
+            }
+        }
+
+        Ok(Context { definitions })
     }
 }
