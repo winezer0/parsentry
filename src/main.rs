@@ -1,15 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use dotenv::dotenv;
-use genai::chat::{ChatMessage, ChatRequest};
-use genai::Client;
-use log::{info, warn};
 use std::path::PathBuf;
 use vulnhuntrs::analyzer::analyze_file_with_context;
 use vulnhuntrs::security_patterns::SecurityRiskPatterns;
 
-use vulnhuntrs::analyzer::analyze_file;
-use vulnhuntrs::prompts::SYS_PROMPT_TEMPLATE;
 use vulnhuntrs::repo::RepoOps;
 
 #[derive(Parser, Debug)]

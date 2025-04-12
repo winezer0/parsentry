@@ -249,8 +249,8 @@ pub async fn analyze_file(
 /// 指定されたContext定義を用いて解析し、Responseを返す。
 pub async fn analyze_file_with_context(
     context: &crate::parser::Context,
-    model: &str,
-    verbosity: u8,
+    _model: &str,
+    _verbosity: u8,
 ) -> Result<Response, Error> {
     // context.definitionsから脆弱性パターンに該当する定義を抽出し、Responseを作成
     let mut analysis = String::new();
