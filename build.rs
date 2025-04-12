@@ -63,6 +63,17 @@ fn main() {
         .flag("-Wno-unused-parameter")
         .compile("tree-sitter-typescript");
 
+    // Add build step for TSX parser
+    cc::Build::new()
+        .include(&dir)
+        .include(&tree_sitter_dir)
+        .include(dir.join("tree-sitter-typescript/tsx/src"))
+        .include(dir.join("tree-sitter-typescript/common"))
+        .file(dir.join("tree-sitter-typescript/tsx/src/parser.c"))
+        .file(dir.join("tree-sitter-typescript/tsx/src/scanner.c"))
+        .flag("-Wno-unused-parameter")
+        .compile("tree-sitter-tsx");
+
     // Add library search path
     println!("cargo:rustc-link-search=native={}", out_dir.display());
 }

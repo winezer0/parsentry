@@ -54,10 +54,16 @@ pub async fn analyze_file(
 ) -> Result<Response, Error> {
     info!("Performing initial analysis of {}", file_path.display());
 
-    let mut parser = CodeParser::new(None)?;
+    let mut parser = CodeParser::new()?;
 
     for file in files {
-        parser.add_file(file)?;
+        if let Err(e) = parser.add_file(file) {
+            warn!(
+                "Failed to add file to parser {}: {}. Skipping file.",
+                file.display(),
+                e
+            );
+        }
     }
 
     let content = std::fs::read_to_string(file_path)?;
@@ -161,15 +167,13 @@ pub async fn analyze_file(
                                 stored_code_definitions.push(def);
                             }
                             Ok(None) => {
-                                warn!("No definition found for context: {}", escaped_name);
-                                continue;
+                                debug!("No definition found for context: {}", escaped_name);
                             }
                             Err(e) => {
                                 warn!(
-                                    "Failed to extract code definition for context {}: {}",
+                                    "Failed to find definition for context {}: {}",
                                     escaped_name, e
                                 );
-                                continue;
                             }
                         }
                     }
