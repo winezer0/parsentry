@@ -55,6 +55,7 @@ pub async fn analyze_file(
     model: &str,
     files: &[PathBuf],
     verbosity: u8,
+    context: &crate::parser::Context,
 ) -> Result<Response, Error> {
     info!("Performing initial analysis of {}", file_path.display());
 
@@ -82,10 +83,23 @@ pub async fn analyze_file(
         });
     }
 
+    // コンテキスト情報をプロンプトに含める
+    let mut context_text = String::new();
+    if !context.definitions.is_empty() {
+        context_text.push_str("\nContext Definitions:\n");
+        for def in &context.definitions {
+            context_text.push_str(&format!(
+                "\nFunction/Definition: {}\nCode:\n{}\n",
+                def.name, def.source
+            ));
+        }
+    }
+
     let prompt = format!(
-        "File: {}\n\nContent:\n{}\n\n{}\n{}\n{}",
+        "File: {}\n\nContent:\n{}\n{}\n\n{}\n{}\n{}",
         file_path.display(),
         content,
+        context_text,
         prompts::INITIAL_ANALYSIS_PROMPT_TEMPLATE,
         prompts::ANALYSIS_APPROACH_TEMPLATE,
         prompts::GUIDELINES_TEMPLATE,
@@ -246,56 +260,6 @@ pub async fn analyze_file(
     Ok(response)
 }
 
-/// 指定されたContext定義を用いて解析し、Responseを返す。
-pub async fn analyze_file_with_context(
-    context: &crate::parser::Context,
-    _model: &str,
-    _verbosity: u8,
-) -> Result<Response, Error> {
-    // context.definitionsから脆弱性パターンに該当する定義を抽出し、Responseを作成
-    let mut analysis = String::new();
-    let mut context_code = Vec::new();
-    let mut vuln_types = Vec::new();
-
-    for def in &context.definitions {
-        // 簡易的にパターン判定（例: パスワードや認証、ネットワーク操作などのキーワードを含むか）
-        if def.source.contains("password") || def.source.contains("auth") {
-            analysis.push_str(&format!(
-                "関数'{}'は認証・パスワード操作を含みます。\n",
-                def.name
-            ));
-            vuln_types.push(crate::response::VulnType::Other("Auth".to_string()));
-            context_code.push(crate::response::ContextCode {
-                name: def.name.clone(),
-                reason: "認証・パスワード操作を含む".to_string(),
-                code_line: def.source.clone(),
-            });
-        } else if def.source.contains("fetch") || def.source.contains("axios") {
-            analysis.push_str(&format!("関数'{}'は外部リクエストを含みます。\n", def.name));
-            vuln_types.push(crate::response::VulnType::Other("Network".to_string()));
-            context_code.push(crate::response::ContextCode {
-                name: def.name.clone(),
-                reason: "外部リクエストを含む".to_string(),
-                code_line: def.source.clone(),
-            });
-        }
-        // 他のパターンも必要に応じて追加
-    }
-
-    if analysis.is_empty() {
-        analysis = "脆弱性パターンに該当する定義は見つかりませんでした。".to_string();
-    }
-
-    Ok(Response {
-        scratchpad: String::from("context.definitionsベースの自動解析"),
-        analysis,
-        poc: String::new(),
-        confidence_score: if vuln_types.is_empty() { 0 } else { 80 },
-        vulnerability_types: vuln_types,
-        context_code: context_code,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,6 +276,9 @@ mod tests {
             "gpt-4o-mini",
             &[PathBuf::from(temp_file.path())],
             0,
+            &crate::parser::Context {
+                definitions: vec![],
+            },
         )
         .await?;
 
@@ -344,6 +311,9 @@ fn main() {
             "gpt-4o-mini",
             &[PathBuf::from(temp_file.path())],
             0,
+            &crate::parser::Context {
+                definitions: vec![],
+            },
         )
         .await?;
 
@@ -390,6 +360,9 @@ fn main() {
             "gpt-4o-mini",
             &[PathBuf::from(temp_file.path())],
             0,
+            &crate::parser::Context {
+                definitions: vec![],
+            },
         )
         .await?;
 

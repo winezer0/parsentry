@@ -20,7 +20,6 @@ pub const INITIAL_ANALYSIS_PROMPT_TEMPLATE: &str = r#"
 - ネットワークリクエストとレスポンス
 - コマンド実行
 - データベースクエリ
-※ vulnerability_typesは上記のいずれか（複数可）を必ず使用してください。
 "#;
 
 pub const ANALYSIS_APPROACH_TEMPLATE: &str = r#"
@@ -55,11 +54,11 @@ pub mod vuln_specific {
         map.insert(
             VulnType::LFI,
             VulnTypeInfo {
-                prompt: "ローカルファイルインクルージョン（LFI）の脆弱性が存在しないか分析してください。".to_string(),
+                prompt: "Analyze for Local File Inclusion vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "パストラバーサルシーケンス（../../ など）".to_string(),
-                    "URLエンコーディングによるバイパス".to_string(),
-                    "ヌルバイトインジェクション".to_string(),
+                    "Path traversal sequences(../../)".to_string(),
+                    "URL encoding".to_string(),
+                    "Null byte injection".to_string(),
                 ],
             },
         );
@@ -67,12 +66,11 @@ pub mod vuln_specific {
         map.insert(
             VulnType::RCE,
             VulnTypeInfo {
-                prompt: "リモートコード実行（RCE）の脆弱性が存在しないか分析してください。"
-                    .to_string(),
+                prompt: "Analyze for Remote Code Execution vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "シェルメタ文字によるコマンドインジェクション".to_string(),
-                    "Pythonコード実行ベクトル".to_string(),
-                    "デシリアライズ攻撃".to_string(),
+                    "Shell metacharacters for command injection".to_string(),
+                    "Python execution vectors".to_string(),
+                    "Deserialization attacks".to_string(),
                 ],
             },
         );
@@ -82,9 +80,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for Server-Side Request Forgery vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "DNSリバインディング攻撃".to_string(),
-                    "IPアドレスのエンコーディングトリック".to_string(),
-                    "リダイレクトチェーン".to_string(),
+                    "DNS rebinding".to_string(),
+                    "IP address encoding tricks".to_string(),
+                    "Redirect chain".to_string(),
                 ],
             },
         );
@@ -94,9 +92,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for Arbitrary File Operation vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "ディレクトリトラバーサルシーケンス".to_string(),
-                    "シンボリックリンクの追従".to_string(),
-                    "競合状態（レースコンディション）".to_string(),
+                    "Directory traversal sequences".to_string(),
+                    "Following symbolic links".to_string(),
+                    "Race conditions".to_string(),
                 ],
             },
         );
@@ -106,9 +104,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for SQL Injection vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "UNIONベースのインジェクション".to_string(),
-                    "ブール型ブラインドインジェクション".to_string(),
-                    "時間差ブラインドインジェクション".to_string(),
+                    "UNION-based injection".to_string(),
+                    "Boolean-based blind injection".to_string(),
+                    "Time-based blind injection".to_string(),
                 ],
             },
         );
@@ -118,9 +116,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for Cross-Site Scripting vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "HTMLエンティティエンコーディングによるバイパス".to_string(),
-                    "JavaScriptテンプレートインジェクション".to_string(),
-                    "DOMベースのXSSベクトル".to_string(),
+                    "HTML entity encoding bypass".to_string(),
+                    "JavaScript template injection".to_string(),
+                    "DOM-based XSS vectors".to_string(),
                 ],
             },
         );
@@ -131,9 +129,9 @@ pub mod vuln_specific {
                 prompt: "Analyze for Insecure Direct Object Reference vulnerabilities..."
                     .to_string(),
                 bypasses: vec![
-                    "パラメータ改ざん".to_string(),
-                    "水平的な権限昇格".to_string(),
-                    "予測可能なリソースパス".to_string(),
+                    "Parameter tampering".to_string(),
+                    "Horizontal privilege escalation".to_string(),
+                    "Predictable resource paths".to_string(),
                 ],
             },
         );

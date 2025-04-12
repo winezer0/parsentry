@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use dotenv::dotenv;
 use std::path::PathBuf;
-use vulnhuntrs::analyzer::analyze_file_with_context;
+use vulnhuntrs::analyzer::analyze_file;
 use vulnhuntrs::security_patterns::SecurityRiskPatterns;
 
 use vulnhuntrs::repo::RepoOps;
@@ -83,9 +83,9 @@ async fn main() -> Result<()> {
         repo.add_file_to_parser(file_path)?;
         let context = repo.collect_context_for_security_pattern(file_path)?;
 
-        // analyze_file_with_contextで解析
+        // analyze_fileで解析
         let analysis_result =
-            analyze_file_with_context(&context, &args.model, args.verbosity).await?;
+            analyze_file(file_path, &args.model, &files, args.verbosity, &context).await?;
 
         analysis_result.print_readable();
     }
