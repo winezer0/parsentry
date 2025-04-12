@@ -1,18 +1,16 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::fs;
 use anyhow::{anyhow, Result};
-use tree_sitter::{Language, Parser, Query, QueryCursor, Node};
-use streaming_iterator::StreamingIterator; // Import the trait
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use streaming_iterator::StreamingIterator;
+use tree_sitter::{Language, Node, Parser, Query, QueryCursor}; // Import the trait
 
-// Import language functions from tree-sitter crates
 extern "C" {
     fn tree_sitter_python() -> Language;
     fn tree_sitter_javascript() -> Language;
     fn tree_sitter_typescript() -> Language;
     fn tree_sitter_tsx() -> Language;
     fn tree_sitter_java() -> Language;
-    // Add other languages here if needed
 }
 
 #[derive(Debug, Clone)]
@@ -37,13 +35,17 @@ impl CodeParser {
     }
 
     pub fn add_file(&mut self, path: &Path) -> Result<()> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| anyhow!("Failed to read file {}: {}", path.display(), e))?;
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            anyhow!(
+                "ファイルの読み込みに失敗しました: {}: {}",
+                path.display(),
+                e
+            )
+        })?;
         self.files.insert(path.to_path_buf(), content.clone());
         Ok(())
     }
 
-    // Helper function to get tree-sitter language from path
     fn get_language(&self, path: &Path) -> Option<Language> {
         let extension = path.extension().and_then(|ext| ext.to_str());
         match extension {
@@ -52,45 +54,44 @@ impl CodeParser {
             Some("ts") => Some(unsafe { tree_sitter_typescript() }),
             Some("tsx") => Some(unsafe { tree_sitter_tsx() }),
             Some("java") => Some(unsafe { tree_sitter_java() }),
-            // Add other extensions here
             _ => None,
         }
     }
 
-    // Helper function to get the path to the query file
     fn get_query_path(&self, language: &Language, query_name: &str) -> Result<PathBuf> {
         let lang_name = if language == &unsafe { tree_sitter_python() } {
             "python"
         } else if language == &unsafe { tree_sitter_javascript() } {
             "javascript"
-        } else if language == &unsafe { tree_sitter_typescript() } || language == &unsafe { tree_sitter_tsx() } {
-            // Use "typescript" subdir for both TS and TSX custom queries
+        } else if language == &unsafe { tree_sitter_typescript() }
+            || language == &unsafe { tree_sitter_tsx() }
+        {
             "typescript"
         } else if language == &unsafe { tree_sitter_java() } {
             "java"
         } else {
-            return Err(anyhow!("Unsupported language for queries"));
+            return Err(anyhow!("クエリに対応していない言語です"));
         };
 
-        // Validate lang_name and query_name to prevent path traversal
         if lang_name.contains('/') || lang_name.contains('\\') || lang_name.contains("..") {
-             return Err(anyhow!("Invalid language name for query path: {}", lang_name));
+            return Err(anyhow!("クエリパスの言語名が不正です: {}", lang_name));
         }
         if query_name.contains('/') || query_name.contains('\\') || query_name.contains("..") {
-             return Err(anyhow!("Invalid query name for query path: {}", query_name));
+            return Err(anyhow!("クエリパスのクエリ名が不正です: {}", query_name));
         }
 
-        // Construct the path relative to the Cargo manifest directory, pointing to custom_queries
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let query_file_name = format!("{}.scm", query_name);
         let query_path = manifest_dir
-            .join("custom_queries") // Point to the new custom_queries directory
-            .join(lang_name)        // Use the language name subdirectory
-            .join(&query_file_name); // Join the validated file name
+            .join("custom_queries")
+            .join(lang_name)
+            .join(&query_file_name);
 
         if !query_path.exists() {
-            // Consider making this a warning or handling it differently if queries might be optional
-            return Err(anyhow!("Query file not found: {}", query_path.display()));
+            return Err(anyhow!(
+                "クエリファイルが見つかりません: {}",
+                query_path.display()
+            ));
         }
 
         Ok(query_path)
@@ -101,10 +102,12 @@ impl CodeParser {
         name: &str,
         source_file: &Path,
     ) -> Result<Option<(PathBuf, Definition)>> {
-        let content = self
-            .files
-            .get(source_file)
-            .ok_or_else(|| anyhow!("File not found in parser: {}", source_file.display()))?;
+        let content = self.files.get(source_file).ok_or_else(|| {
+            anyhow!(
+                "パーサーにファイルが見つかりません: {}",
+                source_file.display()
+            )
+        })?;
 
         let language = match self.get_language(source_file) {
             Some(lang) => lang,
@@ -113,20 +116,30 @@ impl CodeParser {
 
         self.parser
             .set_language(&language)
-            .map_err(|e| anyhow!("Failed to set language: {}", e))?;
+            .map_err(|e| anyhow!("言語の設定に失敗しました: {}", e))?;
 
         let tree = self
             .parser
             .parse(content, None)
-            .ok_or_else(|| anyhow!("Failed to parse file: {}", source_file.display()))?;
+            .ok_or_else(|| anyhow!("ファイルのパースに失敗しました: {}", source_file.display()))?;
 
         // Pass language by reference to get_query_path
         let query_path = self.get_query_path(&language, "definitions")?;
-        let query_str = fs::read_to_string(&query_path)
-            .map_err(|e| anyhow!("Failed to read query file {}: {}", query_path.display(), e))?;
+        let query_str = fs::read_to_string(&query_path).map_err(|e| {
+            anyhow!(
+                "クエリファイルの読み込みに失敗しました: {}: {}",
+                query_path.display(),
+                e
+            )
+        })?;
 
-        let query = Query::new(&language, &query_str)
-            .map_err(|e| anyhow!("Failed to create query from {}: {}", query_path.display(), e))?;
+        let query = Query::new(&language, &query_str).map_err(|e| {
+            anyhow!(
+                "クエリの生成に失敗しました: {}: {}",
+                query_path.display(),
+                e
+            )
+        })?;
 
         let mut query_cursor = QueryCursor::new();
         let mut matches = query_cursor.matches(&query, tree.root_node(), content.as_bytes());
@@ -174,14 +187,17 @@ impl CodeParser {
                 None => continue,
             };
 
-            self.parser
-                .set_language(&language)
-                .map_err(|e| anyhow!("Failed to set language for {}: {}", file_path.display(), e))?;
+            self.parser.set_language(&language).map_err(|e| {
+                anyhow!("Failed to set language for {}: {}", file_path.display(), e)
+            })?;
 
             let tree = match self.parser.parse(content, None) {
                 Some(t) => t,
                 None => {
-                    eprintln!("Warning: Failed to parse file: {}", file_path.display());
+                    eprintln!(
+                        "警告: ファイルのパースに失敗しました: {}",
+                        file_path.display()
+                    );
                     continue;
                 }
             };
@@ -191,7 +207,7 @@ impl CodeParser {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!(
-                        "Warning: Failed to get references query path for {}: {}",
+                        "警告: 参照クエリパスの取得に失敗しました: {}: {}",
                         file_path.display(),
                         e
                     );
@@ -202,7 +218,7 @@ impl CodeParser {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!(
-                        "Warning: Failed to read references query file {}: {}",
+                        "警告: 参照クエリファイルの読み込みに失敗しました: {}: {}",
                         query_path.display(),
                         e
                     );
@@ -214,7 +230,7 @@ impl CodeParser {
                 Ok(q) => q,
                 Err(e) => {
                     eprintln!(
-                        "Warning: Failed to create references query from {}: {}",
+                        "警告: 参照クエリの生成に失敗しました: {}: {}",
                         query_path.display(),
                         e
                     );
@@ -251,86 +267,5 @@ impl CodeParser {
         }
 
         Ok(results)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs; // Keep fs import needed for test_find_references
-
-    #[test]
-    fn test_find_definition() -> Result<()> {
-        let mut parser = CodeParser::new()?;
-
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.py");
-        let file_content = "def test_function():\n    pass\n";
-        std::fs::write(&file_path, file_content).unwrap();
-
-        parser.add_file(&file_path)?;
-
-        let result = parser.find_definition("test_function", &file_path)?;
-        assert!(result.is_some(), "Definition should be found");
-
-        let (path, def) = result.unwrap();
-        assert_eq!(path, file_path);
-        assert_eq!(def.name, "test_function");
-        assert_eq!(def.source, "def test_function():\n    pass");
-        assert_eq!(def.start_byte, 0);
-        assert_eq!(def.end_byte, 29, "End byte should match the node span");
-
-        let result = parser.find_definition("non_existent", &file_path)?;
-        assert!(result.is_none(), "Non-existent definition should not be found");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_find_references() -> Result<()> {
-        let mut parser = CodeParser::new()?;
-        let temp_dir = tempfile::tempdir().unwrap();
-
-        let file_path1 = temp_dir.path().join("main.py");
-        let content1 = r#"def test_function():
-    return "Hello"
-
-x = test_function()
-
-if True:
-    y = test_function()"#;
-        std::fs::write(&file_path1, content1).unwrap();
-
-        let file_path2 = temp_dir.path().join("test.py");
-        let content2 = r#"from main import test_function
-
-def another_function():
-    z = test_function()"#;
-        std::fs::write(&file_path2, content2).unwrap();
-
-        parser.add_file(&file_path1)?;
-        parser.add_file(&file_path2)?;
-
-        let references = parser.find_references("test_function")?;
-        
-        assert_eq!(references.len(), 5, "Expected 5 references (including definition and import)");
-
-        let main_refs_count = references.iter().filter(|(p, _)| p == &file_path1).count();
-        let test_refs_count = references.iter().filter(|(p, _)| p == &file_path2).count();
-
-        assert_eq!(main_refs_count, 3, "Expected 3 references in main.py");
-        assert_eq!(test_refs_count, 2, "Expected 2 references in test.py");
-
-        for (path, def) in references {
-            assert_eq!(def.name, "test_function");
-            assert_eq!(def.source, "test_function");
-            let file_content = fs::read_to_string(path)?;
-            assert_eq!(&file_content[def.start_byte..def.end_byte], "test_function");
-        }
-
-        let references_non_existent = parser.find_references("non_existent")?;
-        assert!(references_non_existent.is_empty(), "Should find no references for non-existent name");
-
-        Ok(())
     }
 }

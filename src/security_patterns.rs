@@ -1,7 +1,5 @@
 use regex::Regex;
 
-/// Patterns to detect potentially vulnerable network-related code
-/// such as HTTP request handlers, API routes, and network interfaces
 #[derive(Default)]
 pub struct SecurityRiskPatterns {
     patterns: Vec<Regex>,
@@ -10,22 +8,18 @@ pub struct SecurityRiskPatterns {
 impl SecurityRiskPatterns {
     pub fn new() -> Self {
         let patterns = vec![
-            // Python patterns
-            r"async\sdef\s\w+\(.*?request", // Async request handlers
-            r"@app\.route\(.*?\)",          // Flask routes
-            r"gr.Interface\(.*?\)",         // Gradio interfaces
-            // JavaScript/TypeScript patterns
-            r"app\.(get|post|put|delete)\(.*?\)", // Express.js routes
-            r"fetch\(.*?\)",                      // Fetch API calls
-            r"axios\.(get|post|put|delete)",      // Axios HTTP calls
-            // Rust patterns
-            r"async\s+fn\s+\w+.*?Request", // Async request handlers
-            r"#\[.*?route.*?\]",           // Route attributes
-            r"#\[(get|post|put|delete)\(.*?\)]", // Actix-web route attributes
-            r"HttpServer::new",            // HTTP server initialization
-            // Generic patterns
-            r"listen\(.*?\)", // Network listeners
-            r"bind\(.*?\)",   // Socket bindings
+            r"async\sdef\s\w+\(.*?request",
+            r"@app\.route\(.*?\)",
+            r"gr.Interface\(.*?\)",
+            r"app\.(get|post|put|delete)\(.*?\)",
+            r"fetch\(.*?\)",
+            r"axios\.(get|post|put|delete)",
+            r"async\s+fn\s+\w+.*?Request",
+            r"#\[.*?route.*?\]",
+            r"#\[(get|post|put|delete)\(.*?\)]",
+            r"HttpServer::new",
+            r"listen\(.*?\)",
+            r"bind\(.*?\)",
         ]
         .into_iter()
         .map(|p| Regex::new(p).unwrap())

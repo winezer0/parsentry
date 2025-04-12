@@ -64,47 +64,47 @@ pub fn response_json_schema() -> serde_json::Value {
 
 impl Response {
     pub fn print_readable(&self) {
-        println!("\n📝 Analysis Report");
+        println!("\n📝 解析レポート");
         println!("{}", "=".repeat(80));
 
-        println!("\n🔍 Analysis:");
+        println!("\n🔍 解析結果:");
         println!("{}", "-".repeat(80));
         println!("{}", self.analysis);
 
         if !self.vulnerability_types.is_empty() {
-            println!("\n⚠️  Identified Vulnerabilities:");
+            println!("\n⚠️  検出された脆弱性:");
             println!("{}", "-".repeat(80));
             for vuln in &self.vulnerability_types {
                 println!("  • {:?}", vuln);
             }
         }
 
-        println!("\n🎯 Confidence Score: {}%", self.confidence_score);
+        println!("\n🎯 信頼度スコア: {}%", self.confidence_score);
         println!("{}", "-".repeat(80));
 
         if !self.poc.is_empty() {
-            println!("\n🔨 Proof of Concept:");
+            println!("\n🔨 PoC（概念実証コード）:");
             println!("{}", "-".repeat(80));
             println!("{}", self.poc);
         }
 
         if !self.context_code.is_empty() {
-            println!("\n📄 Relevant Code Context:");
+            println!("\n📄 関連コードコンテキスト:");
             println!("{}", "-".repeat(80));
             for context in &self.context_code {
-                println!("Function: {}", context.name);
-                println!("Reason: {}", context.reason);
-                println!("Code: {}", context.code_line);
+                println!("関数名: {}", context.name);
+                println!("理由: {}", context.reason);
+                println!("コード: {}", context.code_line);
                 println!();
             }
         }
 
         if !self.scratchpad.is_empty() {
-            println!("\n📓 Analysis Notes:");
+            println!("\n📓 解析ノート:");
             println!("{}", "-".repeat(80));
             println!("{}", self.scratchpad);
         }
 
-        println!(); // Add final newline for better spacing
+        println!();
     }
 }

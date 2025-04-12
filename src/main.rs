@@ -42,28 +42,23 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let repo = RepoOps::new(args.root.clone());
 
-    println!("\n🔍 Vulnhuntrs - Security Analysis Tool\n");
+    println!("\n🔍 Vulnhuntrs - セキュリティ解析ツール\n");
 
-    // Get repo files excluding tests and documentation
     let files = repo.get_relevant_files();
-    println!("📁 Found relevant source files");
+    println!("📁 関連するソースファイルを検出しました");
 
-    // Get files to analyze based on command line args
-    // If no specific path is provided, analyze files with potential security risks
     let files_to_analyze = if let Some(analyze_path) = args.analyze {
         repo.get_files_to_analyze(Some(analyze_path))?
     } else {
         repo.get_network_related_files(&files)
     };
 
-    // Initialize genai client
     let client = Client::default();
 
-    // Read README content
     if let Some(readme_content) = repo.get_readme_content() {
-        println!("📖 Analyzing project README...");
-        info!("Summarizing project README");
-        log::debug!("README content length: {} characters", readme_content.len());
+        println!("📖 プロジェクトのREADMEを解析中...");
+        info!("プロジェクトREADMEを要約中");
+        log::debug!("READMEの文字数: {} 文字", readme_content.len());
 
         let chat_req = ChatRequest::new(vec![
             ChatMessage::system(SYS_PROMPT_TEMPLATE),
@@ -73,18 +68,18 @@ async fn main() -> Result<()> {
             )),
         ]);
 
-        log::debug!("Sending README summary request");
+        log::debug!("README要約リクエストを送信中");
         let chat_res = client.exec_chat(&args.model, chat_req, None).await?;
         let summary = chat_res.content_text_as_str().unwrap_or_default();
-        info!("README summary complete");
-        log::debug!("Received README summary of {} characters", summary.len());
+        info!("READMEの要約が完了しました");
+        log::debug!("受信したREADME要約の文字数: {} 文字", summary.len());
     } else {
-        warn!("No README summary found");
+        warn!("READMEが見つかりませんでした");
     }
 
     for file_path in files_to_analyze {
         let file_name = file_path.display().to_string();
-        println!("\n📄 Analyzing: {}\n", file_name);
+        println!("\n📄 解析対象: {}\n", file_name);
         println!("{}", "=".repeat(80));
 
         let analysis_result = analyze_file(&file_path, &args.model, &files, args.verbosity).await?;
@@ -92,7 +87,7 @@ async fn main() -> Result<()> {
         analysis_result.print_readable();
     }
 
-    println!("\n✅ Analysis complete!\n");
+    println!("\n✅ 解析が完了しました\n");
 
     Ok(())
 }

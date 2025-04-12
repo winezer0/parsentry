@@ -159,7 +159,7 @@ impl RepoOps {
         };
 
         if let Err(e) = self.visit_dirs(&self.repo_path, &mut callback) {
-            eprintln!("Error walking directory: {}", e);
+            eprintln!("ディレクトリの走査中にエラーが発生しました: {}", e);
         }
 
         files
@@ -208,7 +208,7 @@ impl RepoOps {
             Ok(files)
         } else {
             anyhow::bail!(
-                "Specified analyze path does not exist: {}",
+                "指定された解析パスが存在しません: {}",
                 path_to_analyze.display()
             )
         }

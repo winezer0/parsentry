@@ -1,23 +1,15 @@
 {
 	"name": "Codespaces Rust Starter",
 	"image": "mcr.microsoft.com/devcontainers/rust:1",
-	"features": {
-		"ghcr.io/devcontainers/features/python:1": {
-			"installTools": false
-		}
-	},
+	"features": {},
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"cschleiden.vscode-github-actions",
 				"matklad.rust-analyzer",
 				"serayuzgur.crates",
 				"vadimcn.vscode-lldb"
 			],
-			"settings": {
-				"editor.formatOnSave": true,
-				"terminal.integrated.shell.linux": "/usr/bin/zsh"
-			}
+			"settings": {}
 		}
 	}
 }

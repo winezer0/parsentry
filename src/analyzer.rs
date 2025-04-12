@@ -107,7 +107,7 @@ pub async fn analyze_file(
             let mut stored_code_definitions: Vec<(PathBuf, crate::parser::Definition)> = Vec::new();
             let mut previous_analysis = String::new();
 
-            for _ in 0..7 {
+            for _ in 0..2 {
                 info!(
                     "Performing vuln-specific analysis iteration for {:?}",
                     vuln_type
@@ -187,7 +187,21 @@ pub async fn analyze_file(
             }
         }
     }
-
+    if response.confidence_score > 0 && response.confidence_score < 95 {
+        warn!(
+            "信頼度スコア({})が低いため、{}は脆弱性が見つかりませんでした",
+            response.confidence_score,
+            file_path.display()
+        );
+        return Ok(Response {
+            scratchpad: "脆弱性は見つかりませんでした".to_string(),
+            analysis: "脆弱性は見つかりませんでした".to_string(),
+            poc: String::new(),
+            confidence_score: 0,
+            vulnerability_types: vec![],
+            context_code: vec![],
+        });
+    }
     Ok(response)
 }
 
