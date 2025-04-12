@@ -107,11 +107,33 @@ pub async fn analyze_file(
             let mut stored_code_definitions: Vec<(PathBuf, crate::parser::Definition)> = Vec::new();
             let mut previous_analysis = String::new();
 
-            for _ in 0..2 {
+            for iter in 0..2 {
                 info!(
-                    "Performing vuln-specific analysis iteration for {:?}",
-                    vuln_type
+                    "Performing vuln-specific analysis iteration for {:?} (iteration {}/{})",
+                    vuln_type,
+                    iter + 1,
+                    2
                 );
+                if verbosity > 0 {
+                    println!(
+                        "🔎 [{}] 脆弱性タイプ: {:?} の詳細解析 (iteration {}/{})",
+                        file_path.display(),
+                        vuln_type,
+                        iter + 1,
+                        2
+                    );
+                    if !stored_code_definitions.is_empty() {
+                        println!("  解析コンテキスト関数:");
+                        for (_, def) in &stored_code_definitions {
+                            println!("    - {} ({}行)", def.name, def.source.lines().count());
+                        }
+                    }
+                    println!("  考慮バイパス: {}", vuln_info.bypasses.join(", "));
+                    println!(
+                        "  追加プロンプト: {}",
+                        &vuln_info.prompt.chars().take(40).collect::<String>()
+                    );
+                }
 
                 let mut context_code = String::new();
                 for (_, def) in &stored_code_definitions {
@@ -146,6 +168,20 @@ pub async fn analyze_file(
                 let vuln_response: Response = parse_json_response(&chat_content)?;
 
                 if verbosity > 0 {
+                    println!(
+                        "  LLM応答: confidence_score={}, vulnerability_types={:?}",
+                        vuln_response.confidence_score, vuln_response.vulnerability_types
+                    );
+                    println!(
+                        "  analysis要約: {}",
+                        &vuln_response.analysis.chars().take(60).collect::<String>()
+                    );
+                    if !vuln_response.context_code.is_empty() {
+                        println!("  context_code:");
+                        for ctx in &vuln_response.context_code {
+                            println!("    - {}: {}", ctx.name, ctx.reason);
+                        }
+                    }
                     return Ok(vuln_response);
                 }
 

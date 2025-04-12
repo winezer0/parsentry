@@ -42,10 +42,16 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let repo = RepoOps::new(args.root.clone());
 
-    println!("\n🔍 Vulnhuntrs - セキュリティ解析ツール\n");
+    println!("🔍 Vulnhuntrs - セキュリティ解析ツール");
 
     let files = repo.get_relevant_files();
-    println!("📁 関連するソースファイルを検出しました");
+    println!(
+        "📁 関連するソースファイルを検出しました ({}件)",
+        files.len()
+    );
+    for (i, f) in files.iter().enumerate() {
+        println!("  [{}] {}", i + 1, f.display());
+    }
 
     let files_to_analyze = if let Some(analyze_path) = args.analyze {
         repo.get_files_to_analyze(Some(analyze_path))?
@@ -77,17 +83,21 @@ async fn main() -> Result<()> {
         warn!("READMEが見つかりませんでした");
     }
 
-    for file_path in files_to_analyze {
+    let total = files_to_analyze.len();
+    for (idx, file_path) in files_to_analyze.iter().enumerate() {
         let file_name = file_path.display().to_string();
-        println!("\n📄 解析対象: {}\n", file_name);
+        if idx > 0 {
+            println!();
+        }
+        println!("📄 解析対象: {} ({} / {})", file_name, idx + 1, total);
         println!("{}", "=".repeat(80));
 
-        let analysis_result = analyze_file(&file_path, &args.model, &files, args.verbosity).await?;
+        let analysis_result = analyze_file(file_path, &args.model, &files, args.verbosity).await?;
 
         analysis_result.print_readable();
     }
 
-    println!("\n✅ 解析が完了しました\n");
+    println!("✅ 解析が完了しました");
 
     Ok(())
 }

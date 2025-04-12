@@ -2,88 +2,88 @@ use crate::response::VulnType;
 use std::collections::HashMap;
 
 pub const README_SUMMARY_PROMPT_TEMPLATE: &str = r#"
-Analyze the provided README content and create a concise summary that captures:
-- The project's main purpose and functionality
-- Key features and capabilities
-- Important technical details or requirements
-- Any security-related information
+与えられたREADMEの内容を分析し、以下を簡潔にまとめてください：
+- プロジェクトの主目的と機能
+- 主要な特徴や能力
+- 重要な技術的詳細や要件
+- セキュリティに関する情報
 
-Format your response within <summary></summary> tags.
+<summary></summary> タグ内にまとめてください。
 "#;
 
 pub const SYS_PROMPT_TEMPLATE: &str = r#"
-You are a security researcher analyzing code for potential vulnerabilities. Focus on:
-- Input validation and sanitization
-- Authentication and authorization
-- Data handling and exposure
-- Command injection possibilities
-- Path traversal vulnerabilities
-- Other security-critical patterns
+あなたはセキュリティ研究者として、コードの脆弱性を分析します。特に以下に注目してください：
+- 入力値の検証とサニタイズ
+- 認証・認可
+- データの取り扱いと漏洩
+- コマンドインジェクションの可能性
+- パストラバーサルの脆弱性
+- その他セキュリティ上重要なパターン
 
-Your response must be in the following JSON format:
+必ず以下のJSON形式で日本語で回答してください:
 {
-    "scratchpad": "Your working notes and thoughts",
-    "analysis": "Detailed security analysis",
-    "poc": "Proof of concept or exploitation steps",
+    "scratchpad": "作業メモや思考過程",
+    "analysis": "詳細なセキュリティ分析",
+    "poc": "概念実証や攻撃手順",
     "confidence_score": 0-100,
     "vulnerability_types": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"],
     "context_code": [
         {
-            "name": "function_or_block_name",
-            "reason": "why this code is relevant",
-            "code_line": "the specific line of code"
+            "name": "関数やブロック名",
+            "reason": "このコードが脆弱性に関係する理由",
+            "code_line": "該当するコード行"
         }
     ]
 }
 
-Consider the project context from the README summary below when analyzing the code.
+READMEサマリーの内容も考慮して分析してください。
 "#;
 
 pub const INITIAL_ANALYSIS_PROMPT_TEMPLATE: &str = r#"
-Analyze the provided code for potential security vulnerabilities. Consider:
-- User input handling and validation
-- Authentication and authorization mechanisms
-- Data sanitization and escaping
-- File system operations
-- Network requests and responses
-- Command execution
-- Database queries
+与えられたコードをセキュリティ脆弱性の観点から分析してください。特に以下を考慮してください：
+- ユーザー入力の取り扱いと検証
+- 認証・認可の仕組み
+- データのサニタイズやエスケープ
+- ファイルシステム操作
+- ネットワークリクエストとレスポンス
+- コマンド実行
+- データベースクエリ
 
-Your response must strictly follow this JSON format:
+必ず以下のJSON形式で日本語で回答してください:
 {
-    "scratchpad": "Your step-by-step analysis process and working notes",
-    "analysis": "Detailed findings and vulnerability explanations",
-    "poc": "Concrete proof of concept or exploitation steps",
+    "scratchpad": "分析の手順や作業メモ",
+    "analysis": "詳細な発見内容と脆弱性の説明",
+    "poc": "具体的な概念実証や攻撃手順",
     "confidence_score": 0-100,
     "vulnerability_types": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"],
     "context_code": [
         {
-            "name": "function_or_block_name",
-            "reason": "why this code is relevant to the vulnerability",
-            "code_line": "the specific vulnerable line of code"
+            "name": "関数やブロック名",
+            "reason": "このコードが脆弱性に関係する理由",
+            "code_line": "該当する脆弱なコード行"
         }
     ]
 }
 
-Note: vulnerability_types must be one or more of the exact values shown above.
+※ vulnerability_typesは上記のいずれか（複数可）を必ず使用してください。
 "#;
 
 pub const ANALYSIS_APPROACH_TEMPLATE: &str = r#"
-Follow these steps in your analysis:
-1. Identify entry points and user-controlled input
-2. Trace data flow through the application
-3. Examine security-critical operations
-4. Consider bypass techniques for existing protections
-5. Evaluate the impact of potential vulnerabilities
+以下の手順で分析を進めてください：
+1. エントリポイントとユーザーが制御可能な入力を特定する
+2. アプリケーション内のデータフローを追跡する
+3. セキュリティ上重要な操作を調査する
+4. 既存の防御策を回避する手法（バイパス）を検討する
+5. 潜在的な脆弱性の影響を評価する
 "#;
 
 pub const GUIDELINES_TEMPLATE: &str = r#"
-Adhere to these guidelines:
-1. Focus on concrete vulnerabilities with clear exploitation paths
-2. Provide specific code references and line numbers
-3. Consider the full context of the application
-4. Rate confidence based on code visibility and analysis depth
-5. Request additional context if needed for better analysis
+以下のガイドラインを遵守してください：
+1. 実際に悪用可能な脆弱性に絞って分析する
+2. 該当するコード箇所や行番号を具体的に示す
+3. アプリケーション全体の文脈を考慮する
+4. コードの可視性や分析の深さに応じて信頼度を評価する
+5. より良い分析のために追加情報が必要な場合はリクエストする
 "#;
 
 pub mod vuln_specific {
@@ -100,11 +100,11 @@ pub mod vuln_specific {
         map.insert(
             VulnType::LFI,
             VulnTypeInfo {
-                prompt: "Analyze for Local File Inclusion vulnerabilities...".to_string(),
+                prompt: "ローカルファイルインクルージョン（LFI）の脆弱性が存在しないか分析してください。".to_string(),
                 bypasses: vec![
-                    "Path traversal sequences (../../)".to_string(),
-                    "URL encoding bypasses".to_string(),
-                    "Null byte injection".to_string(),
+                    "パストラバーサルシーケンス（../../ など）".to_string(),
+                    "URLエンコーディングによるバイパス".to_string(),
+                    "ヌルバイトインジェクション".to_string(),
                 ],
             },
         );
@@ -112,11 +112,12 @@ pub mod vuln_specific {
         map.insert(
             VulnType::RCE,
             VulnTypeInfo {
-                prompt: "Analyze for Remote Code Execution vulnerabilities...".to_string(),
+                prompt: "リモートコード実行（RCE）の脆弱性が存在しないか分析してください。"
+                    .to_string(),
                 bypasses: vec![
-                    "Command injection through shell metacharacters".to_string(),
-                    "Python code execution vectors".to_string(),
-                    "Deserialization attacks".to_string(),
+                    "シェルメタ文字によるコマンドインジェクション".to_string(),
+                    "Pythonコード実行ベクトル".to_string(),
+                    "デシリアライズ攻撃".to_string(),
                 ],
             },
         );
@@ -126,9 +127,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for Server-Side Request Forgery vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "DNS rebinding attacks".to_string(),
-                    "IP address encoding tricks".to_string(),
-                    "Redirect chains".to_string(),
+                    "DNSリバインディング攻撃".to_string(),
+                    "IPアドレスのエンコーディングトリック".to_string(),
+                    "リダイレクトチェーン".to_string(),
                 ],
             },
         );
@@ -138,9 +139,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for Arbitrary File Operation vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "Directory traversal sequences".to_string(),
-                    "Symbolic link following".to_string(),
-                    "Race conditions".to_string(),
+                    "ディレクトリトラバーサルシーケンス".to_string(),
+                    "シンボリックリンクの追従".to_string(),
+                    "競合状態（レースコンディション）".to_string(),
                 ],
             },
         );
@@ -150,9 +151,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for SQL Injection vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "UNION-based injection".to_string(),
-                    "Boolean-based blind injection".to_string(),
-                    "Time-based blind injection".to_string(),
+                    "UNIONベースのインジェクション".to_string(),
+                    "ブール型ブラインドインジェクション".to_string(),
+                    "時間差ブラインドインジェクション".to_string(),
                 ],
             },
         );
@@ -162,9 +163,9 @@ pub mod vuln_specific {
             VulnTypeInfo {
                 prompt: "Analyze for Cross-Site Scripting vulnerabilities...".to_string(),
                 bypasses: vec![
-                    "HTML entity encoding bypasses".to_string(),
-                    "JavaScript template injection".to_string(),
-                    "DOM-based XSS vectors".to_string(),
+                    "HTMLエンティティエンコーディングによるバイパス".to_string(),
+                    "JavaScriptテンプレートインジェクション".to_string(),
+                    "DOMベースのXSSベクトル".to_string(),
                 ],
             },
         );
@@ -175,9 +176,9 @@ pub mod vuln_specific {
                 prompt: "Analyze for Insecure Direct Object Reference vulnerabilities..."
                     .to_string(),
                 bypasses: vec![
-                    "Parameter manipulation".to_string(),
-                    "Horizontal privilege escalation".to_string(),
-                    "Predictable resource locations".to_string(),
+                    "パラメータ改ざん".to_string(),
+                    "水平的な権限昇格".to_string(),
+                    "予測可能なリソースパス".to_string(),
                 ],
             },
         );
