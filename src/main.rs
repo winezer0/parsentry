@@ -7,7 +7,7 @@ use log::{info, warn};
 use std::path::PathBuf;
 
 use vulnhuntrs::analyzer::analyze_file;
-use vulnhuntrs::prompts::{README_SUMMARY_PROMPT_TEMPLATE, SYS_PROMPT_TEMPLATE};
+use vulnhuntrs::prompts::SYS_PROMPT_TEMPLATE;
 use vulnhuntrs::repo::RepoOps;
 
 #[derive(Parser, Debug)]
@@ -60,28 +60,6 @@ async fn main() -> Result<()> {
     };
 
     let client = Client::default();
-
-    if let Some(readme_content) = repo.get_readme_content() {
-        println!("📖 プロジェクトのREADMEを解析中...");
-        info!("プロジェクトREADMEを要約中");
-        log::debug!("READMEの文字数: {} 文字", readme_content.len());
-
-        let chat_req = ChatRequest::new(vec![
-            ChatMessage::system(SYS_PROMPT_TEMPLATE),
-            ChatMessage::user(format!(
-                "{}\n{}",
-                readme_content, README_SUMMARY_PROMPT_TEMPLATE
-            )),
-        ]);
-
-        log::debug!("README要約リクエストを送信中");
-        let chat_res = client.exec_chat(&args.model, chat_req, None).await?;
-        let summary = chat_res.content_text_as_str().unwrap_or_default();
-        info!("READMEの要約が完了しました");
-        log::debug!("受信したREADME要約の文字数: {} 文字", summary.len());
-    } else {
-        warn!("READMEが見つかりませんでした");
-    }
 
     let total = files_to_analyze.len();
     for (idx, file_path) in files_to_analyze.iter().enumerate() {

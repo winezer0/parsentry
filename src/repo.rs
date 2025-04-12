@@ -1,11 +1,8 @@
-use crate::parser::{CodeParser, Definition};
-
 use crate::security_patterns::SecurityRiskPatterns;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::{
-    collections::HashMap,
-    fs::{self, read_dir, read_to_string, File},
-    io::{self, BufRead, BufReader, Result as IoResult},
+    fs::{read_dir, File},
+    io::{BufRead, BufReader, Result as IoResult},
     path::{Path, PathBuf},
 };
 #[derive(Default)]
@@ -56,6 +53,15 @@ impl RepoOps {
         }
     }
 
+    /// security_patterns該当ファイルを起点に関連定義をContextとしてまとめる
+    pub fn collect_context_for_security_pattern(
+        &mut self,
+        file_path: &std::path::Path,
+    ) -> anyhow::Result<crate::parser::Context> {
+        // TODO: parser.build_context_from_fileを利用してContextを構築
+        self.code_parser.build_context_from_file(file_path)
+    }
+
     fn read_gitignore(repo_path: &Path) -> IoResult<Vec<String>> {
         let gitignore_path = repo_path.join(".gitignore");
         if !gitignore_path.exists() {
@@ -71,7 +77,7 @@ impl RepoOps {
             let trimmed = line.trim();
             if !trimmed.is_empty() && !trimmed.starts_with('#') {
                 patterns.push(trimmed.to_string());
-            }
+            };
         }
 
         Ok(patterns)
@@ -90,20 +96,6 @@ impl RepoOps {
             }
         }
         Ok(())
-    }
-
-    pub fn get_readme_content(&self) -> Option<String> {
-        let readme_names = ["README.md", "README.MD", "Readme.md", "readme.md"];
-
-        for name in readme_names {
-            let readme_path = self.repo_path.join(name);
-            if readme_path.exists() {
-                if let Ok(content) = read_to_string(&readme_path) {
-                    return Some(content);
-                }
-            }
-        }
-        None
     }
 
     fn should_exclude_path(&self, path: &Path) -> bool {

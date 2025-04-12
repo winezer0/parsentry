@@ -1,16 +1,6 @@
 use crate::response::VulnType;
 use std::collections::HashMap;
 
-pub const README_SUMMARY_PROMPT_TEMPLATE: &str = r#"
-与えられたREADMEの内容を分析し、以下を簡潔にまとめてください：
-- プロジェクトの主目的と機能
-- 主要な特徴や能力
-- 重要な技術的詳細や要件
-- セキュリティに関する情報
-
-<summary></summary> タグ内にまとめてください。
-"#;
-
 pub const SYS_PROMPT_TEMPLATE: &str = r#"
 あなたはセキュリティ研究者として、コードの脆弱性を分析します。特に以下に注目してください：
 - 入力値の検証とサニタイズ
@@ -36,7 +26,6 @@ pub const SYS_PROMPT_TEMPLATE: &str = r#"
     ]
 }
 
-READMEサマリーの内容も考慮して分析してください。
 "#;
 
 pub const INITIAL_ANALYSIS_PROMPT_TEMPLATE: &str = r#"
