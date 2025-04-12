@@ -104,7 +104,7 @@ pub async fn analyze_file(
         prompts::ANALYSIS_APPROACH_TEMPLATE,
         prompts::GUIDELINES_TEMPLATE,
     );
-    println!("[LLMリクエストプロンプト]\n{}", prompt);
+    debug!("[PROMPT]\n{}", prompt);
 
     let chat_req = ChatRequest::new(vec![
         ChatMessage::system("You are a security vulnerability analyzer. You must reply with exactly one JSON object that matches this schema: { \"scratchpad\": string, \"analysis\": string, \"poc\": string, \"confidence_score\": integer, \"vulnerability_types\": array of strings, \"context_code\": array of objects with { \"name\": string, \"reason\": string, \"code_line\": string } }. Do not include any explanatory text outside the JSON object."),
@@ -113,6 +113,7 @@ pub async fn analyze_file(
 
     let json_client = create_api_client();
     let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
+    debug!("[LLM Response]\n{}", chat_content);
     let response: Response = parse_json_response(&chat_content)?;
 
     info!("Initial analysis complete");
@@ -184,10 +185,11 @@ pub async fn analyze_file(
 
                 let json_client = create_api_client();
                 let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
+                debug!("[LLM Response]\n{}", chat_content);
                 let vuln_response: Response = parse_json_response(&chat_content)?;
 
                 if verbosity > 0 {
-                    println!(
+                    debug!(
                         "  LLM応答: confidence_score={}, vulnerability_types={:?}",
                         vuln_response.confidence_score, vuln_response.vulnerability_types
                     );
