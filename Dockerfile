@@ -1,7 +1,10 @@
 # ---- Build Stage ----
-FROM rust:1.77-slim as builder
+FROM rust:1.86.0-slim AS builder
 
 WORKDIR /app
+
+# OpenSSL依存crateのビルドに必要なパッケージをインストール
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # 依存関係キャッシュのため、Cargo.tomlとCargo.lockのみを先にコピー
 COPY Cargo.toml Cargo.lock ./
@@ -16,7 +19,7 @@ RUN cargo build --release
 # ---- Runtime Stage ----
 FROM debian:bullseye-slim
 
-# 必要なライブラリのみインストール（libssl等が必要な場合がある）
+# 必要なランタイムライブラリのみインストール
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

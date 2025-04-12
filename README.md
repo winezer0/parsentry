@@ -13,45 +13,17 @@ Vulnhuntrs is a security analysis tool designed to detect vulnerabilities in app
 ## Features
 
 - Static code analysis for security vulnerabilities
-- Support for multiple programming languages
+- Multi-language support
 - Detailed vulnerability reports
 - Example vulnerable applications for testing
 
 ![analyze-python](./analyze-python.png)
 
-## Installation
+### Usage
 
 ```bash
-# Clone the repository
-git clone https://github.com/HikaruEgashira/vulnhuntrs.git
-
-# Build the project
-cargo build --release
+docker run --rm -v $(pwd):/work -w /work ghcr.io/HikaruEgashira/vulnhuntrs:latest -r <path-to-project>
 ```
-
-## Usage
-
-```bash
-vulnhuntrs -r <path-to-project>
-```
-
-## Example Applications
-
-The repository includes example vulnerable applications to demonstrate the tool's capabilities:
-
-- Python app(`example/python-vulnerable-app`) + gpt-4o-0806
-```bash
-export OPENAI_API_KEY=your-api-key
-cargo run -- -r example/python-vulnerable-app 
-```
-
-- Rust app(`example/rust-vulnerable-app`) + gpt-4o-mini
-```bash
-export OPENAI_API_KEY=your-api-key
-cargo run -- -r example/rust-vulnerable-app -m gpt-4o-mini
-```
-
-These examples are for educational purposes only. Do not use them in production environments.
 
 ## Security
 
@@ -63,4 +35,4 @@ AGPL 3.0
 
 ## Acknowledgements
 
-This project was inspired by the [protectai/vulnhunter](https://github.com/protectai/vulnhuntr).
+This project was inspired by [protectai/vulnhunter](https://github.com/protectai/vulnhuntr).
