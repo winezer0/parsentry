@@ -11,12 +11,8 @@ snapshot-test = []
 
 [dependencies]
 tree-sitter = "0.24.6"
-stack-graphs = { version = "0.14", features = ["storage"] }
-tree-sitter-stack-graphs = { version = "0.10.0", features = ["cli"] }
-tree-sitter-stack-graphs-java = "0.5"
-tree-sitter-stack-graphs-javascript = "0.3"
-tree-sitter-stack-graphs-python = "0.3"
-tree-sitter-stack-graphs-typescript = "0.4"
+streaming-iterator = "0.1"
+tree-sitter-typescript = { version = "0.20" }
 tokio = { version = "1.36", features = ["full", "test-util", "macros"] }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }

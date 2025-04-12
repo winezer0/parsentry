@@ -6,6 +6,7 @@ To resolve the issue with the openssl-sys crate, you need to install the pkg-con
 sudo apt update
 sudo apt install pkg-config libssl-dev
 
-# INSTALL tree-sitter-lang
-git submodule update --init
+# Tree-sitter grammars are included in the repository and compiled during the build process.
+# The following command is no longer needed:
+# git submodule update --init 
 ```
