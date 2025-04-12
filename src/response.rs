@@ -73,17 +73,6 @@ impl Response {
         println!("{}", "-".repeat(80));
         println!("{}", self.analysis);
 
-        if !self.vulnerability_types.is_empty() {
-            println!("\n⚠️  検出された脆弱性:");
-            println!("{}", "-".repeat(80));
-            for vuln in &self.vulnerability_types {
-                println!("  • {:?}", vuln);
-            }
-        }
-
-        println!("\n🎯 信頼度スコア: {}%", self.confidence_score);
-        println!("{}", "-".repeat(80));
-
         if !self.poc.is_empty() {
             println!("\n🔨 PoC（概念実証コード）:");
             println!("{}", "-".repeat(80));
