@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
-use tree_sitter::{Language, Node, Parser, Query, QueryCursor}; // Import the trait
+use tree_sitter::{Language, Node, Parser, Query, QueryCursor};
 
 extern "C" {
     fn tree_sitter_python() -> Language;
@@ -22,8 +22,8 @@ pub struct Definition {
 }
 
 pub struct CodeParser {
-    files: HashMap<PathBuf, String>,
-    parser: Parser,
+    pub files: HashMap<PathBuf, String>,
+    pub parser: Parser,
 }
 
 impl CodeParser {
@@ -35,7 +35,7 @@ impl CodeParser {
     }
 
     pub fn add_file(&mut self, path: &Path) -> Result<()> {
-        let content = std::fs::read_to_string(path).map_err(|e| {
+        let content = fs::read_to_string(path).map_err(|e| {
             anyhow!(
                 "ファイルの読み込みに失敗しました: {}: {}",
                 path.display(),
@@ -123,7 +123,6 @@ impl CodeParser {
             .parse(content, None)
             .ok_or_else(|| anyhow!("ファイルのパースに失敗しました: {}", source_file.display()))?;
 
-        // Pass language by reference to get_query_path
         let query_path = self.get_query_path(&language, "definitions")?;
         let query_str = fs::read_to_string(&query_path).map_err(|e| {
             anyhow!(
@@ -150,7 +149,6 @@ impl CodeParser {
 
             for cap in mat.captures {
                 let capture_name = &query.capture_names()[cap.index as usize];
-                // Dereference s for comparison with &str
                 match capture_name {
                     s if *s == "definition" => definition_node = Some(cap.node),
                     s if *s == "name" => name_node = Some(cap.node),
@@ -202,7 +200,6 @@ impl CodeParser {
                 }
             };
 
-            // Pass language by reference to get_query_path
             let query_path = match self.get_query_path(&language, "references") {
                 Ok(p) => p,
                 Err(e) => {
@@ -243,7 +240,6 @@ impl CodeParser {
 
             while let Some(mat) = matches.next() {
                 for cap in mat.captures {
-                    // Remove the extra & for comparison
                     if query.capture_names()[cap.index as usize] == "reference" {
                         let node = cap.node;
                         if node.utf8_text(content.as_bytes())? == name {

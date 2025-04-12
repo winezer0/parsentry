@@ -1,12 +1,13 @@
-use anyhow::Result;
-use std::{
-    fs::{self, read_dir, File},
-    io::{self, BufRead, BufReader},
-    path::{Path, PathBuf},
-};
+use crate::parser::{CodeParser, Definition};
 
 use crate::security_patterns::SecurityRiskPatterns;
-
+use anyhow::{anyhow, Result};
+use std::{
+    collections::HashMap,
+    fs::{self, read_dir, read_to_string, File},
+    io::{self, BufRead, BufReader, Result as IoResult},
+    path::{Path, PathBuf},
+};
 #[derive(Default)]
 pub struct LanguageExclusions {
     pub file_patterns: Vec<String>,
@@ -18,6 +19,8 @@ pub struct RepoOps {
     language_exclusions: LanguageExclusions,
     security_patterns: Option<SecurityRiskPatterns>,
     supported_extensions: Vec<String>,
+    code_parser: crate::parser::CodeParser,
+    parser_initialized: bool,
 }
 
 impl RepoOps {
@@ -28,6 +31,7 @@ impl RepoOps {
             file_patterns: vec!["test_".to_string(), "conftest".to_string()],
         };
 
+        let code_parser = crate::parser::CodeParser::new().unwrap();
         let supported_extensions = vec![
             "py".to_string(),
             "js".to_string(),
@@ -47,10 +51,12 @@ impl RepoOps {
             language_exclusions,
             security_patterns,
             supported_extensions,
+            code_parser,
+            parser_initialized: false,
         }
     }
 
-    fn read_gitignore(repo_path: &Path) -> io::Result<Vec<String>> {
+    fn read_gitignore(repo_path: &Path) -> IoResult<Vec<String>> {
         let gitignore_path = repo_path.join(".gitignore");
         if !gitignore_path.exists() {
             return Ok(Vec::new());
@@ -92,7 +98,7 @@ impl RepoOps {
         for name in readme_names {
             let readme_path = self.repo_path.join(name);
             if readme_path.exists() {
-                if let Ok(content) = fs::read_to_string(&readme_path) {
+                if let Ok(content) = read_to_string(&readme_path) {
                     return Some(content);
                 }
             }
@@ -104,14 +110,12 @@ impl RepoOps {
         if let Ok(relative_path) = path.strip_prefix(&self.repo_path) {
             let relative_str = relative_path.to_string_lossy();
 
-            // Check gitignore patterns
             for pattern in &self.gitignore_patterns {
                 if Self::matches_gitignore_pattern(&relative_str, pattern) {
                     return true;
                 }
             }
 
-            // Check language-specific exclusions
             if let Some(file_name) = path.file_name() {
                 let file_name = file_name.to_string_lossy().to_lowercase();
                 if self
@@ -172,7 +176,7 @@ impl RepoOps {
 
         let mut network_files = Vec::new();
         for file_path in files {
-            if let Ok(content) = fs::read_to_string(file_path) {
+            if let Ok(content) = read_to_string(file_path) {
                 if security_patterns.matches(&content) {
                     network_files.push(file_path.clone());
                 }
@@ -212,5 +216,38 @@ impl RepoOps {
                 path_to_analyze.display()
             )
         }
+    }
+
+    pub fn parse_repo_files(&mut self, analyze_path: Option<PathBuf>) -> Result<()> {
+        let files = self.get_files_to_analyze(analyze_path)?;
+        for file in &files {
+            self.code_parser.add_file(file)?;
+        }
+        self.parser_initialized = true;
+
+        Ok(())
+    }
+
+    pub fn find_definition_in_repo(
+        &mut self,
+        name: &str,
+        source_file: &Path,
+    ) -> anyhow::Result<Option<(PathBuf, crate::parser::Definition)>> {
+        if !self.parser_initialized {
+            self.parse_repo_files(None)?;
+        }
+
+        self.code_parser.find_definition(name, source_file)
+    }
+
+    pub fn find_references_in_repo(
+        &mut self,
+        name: &str,
+    ) -> anyhow::Result<Vec<(PathBuf, crate::parser::Definition)>> {
+        if !self.parser_initialized {
+            self.parse_repo_files(None)?;
+        }
+
+        self.code_parser.find_references(name)
     }
 }
