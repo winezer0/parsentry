@@ -58,14 +58,13 @@ impl CodeParser {
     }
 
     // Helper function to get the path to the query file
-    // Changed signature to accept language by reference
     fn get_query_path(&self, language: &Language, query_name: &str) -> Result<PathBuf> {
-        // Use == directly on Language as it implements PartialEq and Copy
         let lang_name = if language == &unsafe { tree_sitter_python() } {
             "python"
         } else if language == &unsafe { tree_sitter_javascript() } {
             "javascript"
         } else if language == &unsafe { tree_sitter_typescript() } || language == &unsafe { tree_sitter_tsx() } {
+            // Use "typescript" subdir for both TS and TSX custom queries
             "typescript"
         } else if language == &unsafe { tree_sitter_java() } {
             "java"
@@ -73,11 +72,11 @@ impl CodeParser {
             return Err(anyhow!("Unsupported language for queries"));
         };
 
-        // Construct the path relative to the Cargo manifest directory
+        // Construct the path relative to the Cargo manifest directory, pointing to custom_queries
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let query_path = manifest_dir
-            .join(format!("tree-sitter-{}", lang_name))
-            .join("queries")
+            .join("custom_queries") // Point to the new custom_queries directory
+            .join(lang_name)        // Use the language name subdirectory
             .join(format!("{}.scm", query_name));
 
         if !query_path.exists() {
