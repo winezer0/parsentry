@@ -72,14 +72,24 @@ impl CodeParser {
             return Err(anyhow!("Unsupported language for queries"));
         };
 
+        // Validate lang_name and query_name to prevent path traversal
+        if lang_name.contains('/') || lang_name.contains('\\') || lang_name.contains("..") {
+             return Err(anyhow!("Invalid language name for query path: {}", lang_name));
+        }
+        if query_name.contains('/') || query_name.contains('\\') || query_name.contains("..") {
+             return Err(anyhow!("Invalid query name for query path: {}", query_name));
+        }
+
         // Construct the path relative to the Cargo manifest directory, pointing to custom_queries
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let query_file_name = format!("{}.scm", query_name);
         let query_path = manifest_dir
             .join("custom_queries") // Point to the new custom_queries directory
             .join(lang_name)        // Use the language name subdirectory
-            .join(format!("{}.scm", query_name));
+            .join(&query_file_name); // Join the validated file name
 
         if !query_path.exists() {
+            // Consider making this a warning or handling it differently if queries might be optional
             return Err(anyhow!("Query file not found: {}", query_path.display()));
         }
 
