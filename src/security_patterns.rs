@@ -6,6 +6,7 @@ pub struct SecurityRiskPatterns {
 }
 
 impl SecurityRiskPatterns {
+    /// SecurityRiskPatternsインスタンスを生成する。
     pub fn new() -> Self {
         let patterns = vec![
             r"async\sdef\s\w+\(.*?request",
@@ -28,6 +29,7 @@ impl SecurityRiskPatterns {
         Self { patterns }
     }
 
+    /// 内容がいずれかのセキュリティリスクパターンに一致すればtrueを返す。
     pub fn matches(&self, content: &str) -> bool {
         self.patterns
             .iter()

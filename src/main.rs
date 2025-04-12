@@ -35,6 +35,7 @@ struct Args {
 }
 
 #[tokio::main]
+/// コマンドライン引数をパースし、リポジトリ内の関連ファイルを解析してレポートを出力するエントリポイント。
 async fn main() -> Result<()> {
     env_logger::init();
     dotenv().ok();

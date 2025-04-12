@@ -21,12 +21,18 @@ pub struct Definition {
     pub source: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct Context {
+    pub definitions: Vec<Definition>,
+}
+
 pub struct CodeParser {
     pub files: HashMap<PathBuf, String>,
     pub parser: Parser,
 }
 
 impl CodeParser {
+    /// CodeParserインスタンスを生成する。
     pub fn new() -> Result<Self> {
         Ok(Self {
             files: HashMap::new(),
@@ -34,6 +40,7 @@ impl CodeParser {
         })
     }
 
+    /// 指定ファイルの内容をパーサーに追加する。
     pub fn add_file(&mut self, path: &Path) -> Result<()> {
         let content = fs::read_to_string(path).map_err(|e| {
             anyhow!(
@@ -46,6 +53,7 @@ impl CodeParser {
         Ok(())
     }
 
+    /// 指定パスのファイル種別（言語）を取得する。
     fn get_language(&self, path: &Path) -> Option<Language> {
         let extension = path.extension().and_then(|ext| ext.to_str());
         match extension {
@@ -58,6 +66,7 @@ impl CodeParser {
         }
     }
 
+    /// 指定言語・クエリ名に対応するクエリファイルのパスを取得する。
     fn get_query_path(&self, language: &Language, query_name: &str) -> Result<PathBuf> {
         let lang_name = if language == &unsafe { tree_sitter_python() } {
             "python"
@@ -97,6 +106,7 @@ impl CodeParser {
         Ok(query_path)
     }
 
+    /// 指定名の定義をソースファイルから検索する。
     pub fn find_definition(
         &mut self,
         name: &str,
@@ -176,6 +186,7 @@ impl CodeParser {
         Ok(None)
     }
 
+    /// 読み込まれたファイル群から指定名の参照をすべて検索する。
     pub fn find_references(&mut self, name: &str) -> Result<Vec<(PathBuf, Definition)>> {
         let mut results = Vec::new();
 
@@ -263,5 +274,12 @@ impl CodeParser {
         }
 
         Ok(results)
+    }
+    /// 指定ファイルから関連定義を再帰的に収集しContextを構築する。
+    pub fn build_context_from_file(&mut self, start_path: &Path) -> Result<Context> {
+        // TODO: 定義収集ロジック実装
+        Ok(Context {
+            definitions: vec![],
+        })
     }
 }

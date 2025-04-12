@@ -1,21 +1,12 @@
-pub const EVALUATOR_PROMPT_TEMPLATE: &str = r#"You are a security expert tasked with evaluating a vulnerability analysis report. 
-The report should identify vulnerabilities in a Python web application that is known to contain SQL Injection (SQLI), Cross-Site Scripting (XSS), and Remote Code Execution (RCE) vulnerabilities.
+pub const EVALUATOR_PROMPT_TEMPLATE: &str = r#"あなたは、脆弱性分析レポートを評価するセキュリティ専門家です。
+このレポートは、SQLインジェクション（SQLI）、クロスサイトスクリプティング（XSS）、リモートコード実行（RCE）の脆弱性が含まれていることが知られているPythonウェブアプリケーションの脆弱性を特定することを目的としています。
 
-Evaluate the following report based on:
-1. Correctly identified vulnerabilities (SQLI, XSS, RCE)
-2. False positives (vulnerabilities reported that don't exist)
-3. Analysis quality (impact assessment, root cause explanation, mitigation suggestions)
-4. Proof of Concept quality (clear steps, example requests, expected results)
+以下の観点からレポートを評価してください：
+1. 正しく特定された脆弱性（SQLI、XSS、RCE）
+2. 誤検知（存在しない脆弱性が報告されている場合）
+3. 分析の質（影響評価、根本原因の説明、緩和策の提案）
+4. 検証用コードの質（明確な手順、例となるリクエスト、期待される結果）
 
-Report to evaluate:
+評価対象のレポート：
 {report}
-
-Provide your evaluation in the following JSON format:
-{
-    "score": 0-100,
-    "correct_vulns": ["SQLI", "XSS", "RCE"],  // list only correctly identified ones
-    "missed_vulns": ["SQLI", "XSS", "RCE"],   // list vulnerabilities that were missed
-    "false_positives": [],                     // list any incorrectly reported vulnerabilities
-    "feedback": "Detailed feedback explaining the score and suggestions for improvement"
-}
 "#;

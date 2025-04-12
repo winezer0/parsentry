@@ -30,6 +30,7 @@ pub struct Response {
     pub context_code: Vec<ContextCode>,
 }
 
+/// Response構造体のJSONスキーマを返す。
 pub fn response_json_schema() -> serde_json::Value {
     json!({
         "type": "object",
@@ -63,6 +64,7 @@ pub fn response_json_schema() -> serde_json::Value {
 }
 
 impl Response {
+    /// 人間が読みやすい解析レポートを出力する。
     pub fn print_readable(&self) {
         println!("\n📝 解析レポート");
         println!("{}", "=".repeat(80));

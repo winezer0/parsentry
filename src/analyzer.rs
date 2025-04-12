@@ -10,14 +10,16 @@ use crate::parser::CodeParser;
 use crate::prompts::{self, vuln_specific};
 use crate::response::{response_json_schema, Response};
 
+/// チャットAPI用のClientを生成して返す。
 fn create_api_client() -> Client {
     let client_config = ClientConfig::default().with_chat_options(
         ChatOptions::default()
-            .with_response_format(JsonSpec::new("schema", response_json_schema())),
+            .with_response_format(JsonSpec::new("json_object", response_json_schema())),
     );
     Client::builder().with_config(client_config).build()
 }
 
+/// チャットリクエストを実行し、応答内容（文字列）を返す。
 async fn execute_chat_request(
     client: &Client,
     model: &str,
@@ -35,6 +37,7 @@ async fn execute_chat_request(
     }
 }
 
+/// JSON文字列をパースして型Tの構造体に変換する。
 fn parse_json_response<T: DeserializeOwned>(chat_content: &str) -> Result<T> {
     match serde_json::from_str(chat_content) {
         Ok(response) => Ok(response),
@@ -46,6 +49,7 @@ fn parse_json_response<T: DeserializeOwned>(chat_content: &str) -> Result<T> {
     }
 }
 
+/// LLMを用いてファイルの脆弱性解析を行い、Responseを返す。
 pub async fn analyze_file(
     file_path: &PathBuf,
     model: &str,
@@ -86,6 +90,7 @@ pub async fn analyze_file(
         prompts::ANALYSIS_APPROACH_TEMPLATE,
         prompts::GUIDELINES_TEMPLATE,
     );
+    println!("[LLMリクエストプロンプト]\n{}", prompt);
 
     let chat_req = ChatRequest::new(vec![
         ChatMessage::system("You are a security vulnerability analyzer. You must reply with exactly one JSON object that matches this schema: { \"scratchpad\": string, \"analysis\": string, \"poc\": string, \"confidence_score\": integer, \"vulnerability_types\": array of strings, \"context_code\": array of objects with { \"name\": string, \"reason\": string, \"code_line\": string } }. Do not include any explanatory text outside the JSON object."),
@@ -239,6 +244,23 @@ pub async fn analyze_file(
         });
     }
     Ok(response)
+}
+
+/// 指定されたContext定義を用いて解析し、Responseを返す。
+pub async fn analyze_file_with_context(
+    context: &crate::parser::Context,
+    model: &str,
+    verbosity: u8,
+) -> Result<Response, Error> {
+    // TODO: context.definitionsを使ってパターンごとに解析し、Responseを作成
+    Ok(Response {
+        scratchpad: String::new(),
+        analysis: String::new(),
+        poc: String::new(),
+        confidence_score: 0,
+        vulnerability_types: vec![],
+        context_code: vec![],
+    })
 }
 
 #[cfg(test)]

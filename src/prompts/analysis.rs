@@ -9,23 +9,6 @@ pub const SYS_PROMPT_TEMPLATE: &str = r#"
 - コマンドインジェクションの可能性
 - パストラバーサルの脆弱性
 - その他セキュリティ上重要なパターン
-
-必ず以下のJSON形式で日本語で回答してください:
-{
-    "scratchpad": "作業メモや思考過程",
-    "analysis": "詳細なセキュリティ分析",
-    "poc": "概念実証や攻撃手順",
-    "confidence_score": 0-100,
-    "vulnerability_types": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"],
-    "context_code": [
-        {
-            "name": "関数やブロック名",
-            "reason": "このコードが脆弱性に関係する理由",
-            "code_line": "該当するコード行"
-        }
-    ]
-}
-
 "#;
 
 pub const INITIAL_ANALYSIS_PROMPT_TEMPLATE: &str = r#"
@@ -37,23 +20,6 @@ pub const INITIAL_ANALYSIS_PROMPT_TEMPLATE: &str = r#"
 - ネットワークリクエストとレスポンス
 - コマンド実行
 - データベースクエリ
-
-必ず以下のJSON形式で日本語で回答してください:
-{
-    "scratchpad": "分析の手順や作業メモ",
-    "analysis": "詳細な発見内容と脆弱性の説明",
-    "poc": "具体的な概念実証や攻撃手順",
-    "confidence_score": 0-100,
-    "vulnerability_types": ["LFI", "RCE", "SSRF", "AFO", "SQLI", "XSS", "IDOR"],
-    "context_code": [
-        {
-            "name": "関数やブロック名",
-            "reason": "このコードが脆弱性に関係する理由",
-            "code_line": "該当する脆弱なコード行"
-        }
-    ]
-}
-
 ※ vulnerability_typesは上記のいずれか（複数可）を必ず使用してください。
 "#;
 
