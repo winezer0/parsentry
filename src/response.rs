@@ -18,6 +18,7 @@ pub struct ContextCode {
     pub name: String,
     pub reason: String,
     pub code_line: String,
+    pub path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,9 +54,10 @@ pub fn response_json_schema() -> serde_json::Value {
                     "properties": {
                         "name": { "type": "string" },
                         "reason": { "type": "string" },
-                        "code_line": { "type": "string" }
+                        "code_line": { "type": "string" },
+                        "path": { "type": "string" }
                     },
-                    "required": ["name", "reason", "code_line"]
+                    "required": ["name", "reason", "code_line", "path"]
                 }
             }
         },
@@ -86,6 +88,7 @@ impl Response {
                 println!("関数名: {}", context.name);
                 println!("理由: {}", context.reason);
                 println!("コード: {}", context.code_line);
+                println!("パス: {}", context.path);
                 println!();
             }
         }
@@ -97,5 +100,42 @@ impl Response {
         }
 
         println!();
+    }
+
+    /// 解析レポートをMarkdown形式で返す
+    pub fn to_markdown(&self) -> String {
+        let mut md = String::new();
+        md.push_str("# 解析レポート\n\n");
+
+        md.push_str("## 解析結果\n\n");
+        md.push_str(&self.analysis);
+        md.push_str("\n\n");
+
+        if !self.poc.is_empty() {
+            md.push_str("## PoC（概念実証コード）\n\n");
+            md.push_str("```text\n");
+            md.push_str(&self.poc);
+            md.push_str("\n```\n\n");
+        }
+
+        if !self.context_code.is_empty() {
+            md.push_str("## 関連コードコンテキスト\n\n");
+            for context in &self.context_code {
+                md.push_str(&format!("### 関数名: {}\n", context.name));
+                md.push_str(&format!("- 理由: {}\n", context.reason));
+                md.push_str(&format!("- パス: {}\n", context.path));
+                md.push_str("```rust\n");
+                md.push_str(&context.code_line);
+                md.push_str("\n```\n\n");
+            }
+        }
+
+        if !self.scratchpad.is_empty() {
+            md.push_str("## 解析ノート\n\n");
+            md.push_str(&self.scratchpad);
+            md.push_str("\n\n");
+        }
+
+        md
     }
 }

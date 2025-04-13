@@ -11,6 +11,7 @@ snapshot-test = []
 
 [dependencies]
 tree-sitter = "0.24.6"
+git2 = "0.18"
 streaming-iterator = "0.1"
 tree-sitter-typescript = { version = "0.20" }
 tokio = { version = "1.43", features = ["full", "test-util", "macros"] }

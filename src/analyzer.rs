@@ -127,12 +127,12 @@ pub async fn analyze_file(
             let mut stored_code_definitions: Vec<(PathBuf, crate::parser::Definition)> = Vec::new();
             let mut previous_analysis = String::new();
 
-            for iter in 0..2 {
+            for iter in 0..1 {
                 info!(
                     "Performing vuln-specific analysis iteration for {:?} (iteration {}/{})",
                     vuln_type,
                     iter + 1,
-                    2
+                    1
                 );
                 if verbosity > 0 {
                     println!(
@@ -140,7 +140,7 @@ pub async fn analyze_file(
                         file_path.display(),
                         vuln_type,
                         iter + 1,
-                        2
+                        1
                     );
                     if !stored_code_definitions.is_empty() {
                         println!("  解析コンテキスト関数:");

@@ -7,13 +7,26 @@ use vulnhuntrs::security_patterns::Language;
 use vulnhuntrs::security_patterns::SecurityRiskPatterns;
 
 use vulnhuntrs::repo::RepoOps;
+use vulnhuntrs::repo_clone::clone_github_repo;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author,
+    version,
+    about,
+    long_about = None,
+    group = clap::ArgGroup::new("target")
+        .required(true)
+        .args(&["root", "repo"])
+)]
 struct Args {
     /// Path to the root directory of the project
-    #[arg(short, long)]
-    root: PathBuf,
+    #[arg(short, long, group = "target")]
+    root: Option<PathBuf>,
+
+    /// GitHub repository (owner/repo or URL)
+    #[arg(long, group = "target")]
+    repo: Option<String>,
 
     /// Specific path or file within the project to analyze
     #[arg(short, long)]
@@ -30,6 +43,10 @@ struct Args {
     /// Enable evaluation mode for example vulnerable apps
     #[arg(short, long)]
     evaluate: bool,
+
+    /// Output directory for markdown reports
+    #[arg(long)]
+    output_dir: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -39,7 +56,33 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     let args = Args::parse();
-    let mut repo = RepoOps::new(args.root.clone());
+
+    // rootディレクトリの決定
+    let root_dir = if let Some(repo) = &args.repo {
+        // クローン先ディレクトリ名を決定（例: "repo"）
+        let dest = PathBuf::from("repo");
+        if !dest.exists() {
+            println!(
+                "🛠️  GitHubリポジトリをクローン中: {} → {}",
+                repo,
+                dest.display()
+            );
+            clone_github_repo(repo, &dest)
+                .map_err(|e| anyhow::anyhow!("GitHubリポジトリのクローンに失敗: {}", e))?;
+        } else {
+            println!(
+                "⚠️  既にクローン済みディレクトリが存在します: {}",
+                dest.display()
+            );
+        }
+        dest
+    } else if let Some(root) = &args.root {
+        root.clone()
+    } else {
+        panic!("root path or repo must be set");
+    };
+
+    let mut repo = RepoOps::new(root_dir);
 
     println!("🔍 Vulnhuntrs - セキュリティ解析ツール");
 
@@ -87,6 +130,19 @@ async fn main() -> Result<()> {
         // analyze_fileで解析
         let analysis_result =
             analyze_file(file_path, &args.model, &files, args.verbosity, &context).await?;
+
+        // Markdownファイル出力
+        if let Some(ref output_dir) = args.output_dir {
+            std::fs::create_dir_all(output_dir)?;
+            let fname = file_path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string() + ".md")
+                .unwrap_or_else(|| "report.md".to_string());
+            let mut out_path = output_dir.clone();
+            out_path.push(fname);
+            std::fs::write(&out_path, analysis_result.to_markdown())?;
+            println!("📝 Markdownレポートを出力: {}", out_path.display());
+        }
 
         analysis_result.print_readable();
     }
