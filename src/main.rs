@@ -9,6 +9,9 @@ use vulnhuntrs::security_patterns::SecurityRiskPatterns;
 use vulnhuntrs::repo::RepoOps;
 use vulnhuntrs::repo_clone::clone_github_repo;
 
+use futures::future::join_all;
+use std::sync::Arc;
+
 #[derive(Parser, Debug)]
 #[command(
     author,
@@ -79,7 +82,7 @@ async fn main() -> Result<()> {
         panic!("root path or repo must be set");
     };
 
-    let mut repo = RepoOps::new(root_dir);
+    let mut repo = RepoOps::new(root_dir.clone());
 
     println!("🔍 Vulnhuntrs - セキュリティ解析ツール");
 
@@ -112,37 +115,71 @@ async fn main() -> Result<()> {
     }
 
     let total = pattern_files.len();
-    for (idx, file_path) in pattern_files.iter().enumerate() {
-        let file_name = file_path.display().to_string();
-        if idx > 0 {
-            println!();
-        }
-        println!("📄 解析対象: {} ({} / {})", file_name, idx + 1, total);
-        println!("{}", "=".repeat(80));
+    let root_dir = Arc::new(root_dir);
+    let output_dir = args.output_dir.clone();
+    let model = args.model.clone();
+    let files = files.clone();
+    let verbosity = args.verbosity;
 
-        // 関連定義をまとめたContextを構築
-        repo.add_file_to_parser(file_path)?;
-        let context = repo.collect_context_for_security_pattern(file_path)?;
+    let tasks = pattern_files.iter().enumerate().map(|(idx, file_path)| {
+        let file_path = file_path.clone();
+        let root_dir = Arc::clone(&root_dir);
+        let output_dir = output_dir.clone();
+        let model = model.clone();
+        let files = files.clone();
 
-        // analyze_fileで解析
-        let analysis_result =
-            analyze_file(file_path, &args.model, &files, args.verbosity, &context).await?;
+        tokio::spawn(async move {
+            let file_name = file_path.display().to_string();
+            println!("📄 解析対象: {} ({} / {})", file_name, idx + 1, total);
+            println!("{}", "=".repeat(80));
 
-        // Markdownファイル出力
-        if let Some(ref output_dir) = args.output_dir {
-            std::fs::create_dir_all(output_dir)?;
-            let fname = file_path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string() + ".md")
-                .unwrap_or_else(|| "report.md".to_string());
-            let mut out_path = output_dir.clone();
-            out_path.push(fname);
-            std::fs::write(&out_path, analysis_result.to_markdown())?;
-            println!("📝 Markdownレポートを出力: {}", out_path.display());
-        }
+            // 各タスクで独立したRepoOpsを生成
+            let mut repo = RepoOps::new((*root_dir).clone());
+            if let Err(e) = repo.add_file_to_parser(&file_path) {
+                println!("❌ ファイルのパース追加に失敗: {}: {}", file_path.display(), e);
+                return;
+            }
+            let context = match repo.collect_context_for_security_pattern(&file_path) {
+                Ok(ctx) => ctx,
+                Err(e) => {
+                    println!("❌ コンテキスト収集に失敗: {}: {}", file_path.display(), e);
+                    return;
+                }
+            };
 
-        analysis_result.print_readable();
-    }
+            // analyze_fileで解析
+            let analysis_result = match analyze_file(&file_path, &model, &files, verbosity, &context).await {
+                Ok(res) => res,
+                Err(e) => {
+                    println!("❌ 解析に失敗: {}: {}", file_path.display(), e);
+                    return;
+                }
+            };
+
+            // Markdownファイル出力
+            if let Some(ref output_dir) = output_dir {
+                if let Err(e) = std::fs::create_dir_all(output_dir) {
+                    println!("❌ 出力ディレクトリ作成に失敗: {}: {}", output_dir.display(), e);
+                    return;
+                }
+                let fname = file_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string() + ".md")
+                    .unwrap_or_else(|| "report.md".to_string());
+                let mut out_path = output_dir.clone();
+                out_path.push(fname);
+                if let Err(e) = std::fs::write(&out_path, analysis_result.to_markdown()) {
+                    println!("❌ Markdownレポート出力に失敗: {}: {}", out_path.display(), e);
+                    return;
+                }
+                println!("📝 Markdownレポートを出力: {}", out_path.display());
+            }
+
+            analysis_result.print_readable();
+        })
+    });
+
+    join_all(tasks).await;
 
     println!("✅ 解析が完了しました");
 

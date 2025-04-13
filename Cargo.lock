@@ -2121,6 +2121,7 @@ dependencies = [
  "clap",
  "dotenv",
  "env_logger",
+ "futures",
  "genai",
  "git2",
  "insta",

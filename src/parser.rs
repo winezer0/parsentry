@@ -14,6 +14,7 @@ extern "C" {
     fn tree_sitter_typescript() -> Language;
     fn tree_sitter_tsx() -> Language;
     fn tree_sitter_java() -> Language;
+    fn tree_sitter_go() -> Language;
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +67,7 @@ impl CodeParser {
             Some("tsx") => Some(unsafe { tree_sitter_tsx() }),
             Some("java") => Some(unsafe { tree_sitter_java() }),
             Some("rs") => Some(unsafe { tree_sitter_rust() }),
+            Some("go") => Some(unsafe { tree_sitter_go() }),
             _ => None,
         }
     }
