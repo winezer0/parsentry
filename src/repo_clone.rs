@@ -1,4 +1,4 @@
-use git2::{Cred, Direction, Error, FetchOptions, RemoteCallbacks, Repository};
+use git2::{Cred, Error, FetchOptions, RemoteCallbacks, Repository};
 use std::env;
 use std::path::Path;
 

@@ -8,6 +8,7 @@ pub enum Language {
     Rust,
     TypeScript,
     Java,
+    Go,
     Other,
 }
 
@@ -19,6 +20,7 @@ impl Language {
             "rs" => Language::Rust,
             "ts" => Language::TypeScript,
             "java" => Language::Java,
+            "go" => Language::Go,
             _ => Language::Other,
         }
     }
@@ -178,6 +180,60 @@ impl SecurityRiskPatterns {
                 r#"Files\.newBufferedWriter"#,
                 r#"PrintWriter"#,
                 r#"ServletOutputStream"#,
+            ],
+        );
+        map.insert(
+            Go,
+            vec![
+            r#"\bhttp\.HandleFunc\s*\("#,
+            r#"\bhttp\.ListenAndServe\s*\("#,
+            r#"\bos\.Exec\s*\("#,
+            r#"\bos\.StartProcess\s*\("#,
+            r#"\bos\.OpenFile\s*\("#,
+            r#"\bios\.WriteFile\s*\("#,
+            r#"\bnet\.Dial\s*\("#,
+            r#"\bnet\.Listen\s*\("#,
+            r#"\bjson\.Unmarshal\s*\("#,
+            r#"\bxml\.Unmarshal\s*\("#,
+            r#"\btemplate\.Must\s*\("#,
+            r#"\btemplate\.ParseFiles\s*\("#,
+            r#"\bexec\.Command\s*\("#,
+            r#"\bexec\.LookPath\s*\("#,
+            r#"\bcrypto\/tls"#,
+            r#"\bcrypto\/x509"#,
+            r#"\bencoding\/gob"#,
+            r#"\bencoding\/json"#,
+            r#"\bencoding\/xml"#,
+            // SQL execution and DB sinks
+            r#"\bdb\.Query\s*\("#,
+            r#"\bdb\.QueryRow\s*\("#,
+            r#"\bdb\.Exec\s*\("#,
+            r#"\bdb\.Prepare\s*\("#,
+            r#"\bsql\.Open\s*\("#,
+            r#"\bsql\.DB"#,
+            r#"\bGORM"#,
+            r#"\bRaw\s*\("#,
+            r#"\bScan\s*\("#,
+            // File and network sinks
+            r#"\bios\.Create\s*\("#,
+            r#"\bios\.Remove\s*\("#,
+            r#"\bios\.Rename\s*\("#,
+            r#"\bios\.Chmod\s*\("#,
+            r#"\bios\.Mkdir\s*\("#,
+            r#"\bios\.MkdirAll\s*\("#,
+            r#"\bnet\.Conn"#,
+            r#"\bnet\.TCPConn"#,
+            r#"\bnet\.UDPConn"#,
+            // Dangerous reflection and code execution
+            r#"\breflect\.Value"#,
+            r#"\bruntime\.Caller"#,
+            // Email and external communication
+            r#"\bnet/smtp"#,
+            r#"\bhttp\.Post\s*\("#,
+            r#"\bhttp\.PostForm\s*\("#,
+            r#"\bhttp\.Get\s*\("#,
+            // Unsafe
+            r#"\bunsafe\."#,
             ],
         );
         map.insert(
