@@ -79,7 +79,7 @@ fn main() {
         .include(&dir)
         .include(&tree_sitter_dir)
         .file(dir.join("tree-sitter-ruby/src/parser.c"))
-        .file(dir.join("tree-sitter-ruby/src/scanner.c")) // Assuming scanner.c exists, like Python/JS/Rust/TS
+        .file(dir.join("tree-sitter-ruby/src/scanner.c"))
         .flag("-Wno-unused-parameter")
         .compile("tree-sitter-ruby");
 

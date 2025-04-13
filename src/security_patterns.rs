@@ -9,7 +9,7 @@ pub enum Language {
     TypeScript,
     Java,
     Go,
-    Ruby, // Added Ruby
+    Ruby,
     Other,
 }
 
@@ -22,7 +22,7 @@ impl Language {
             "ts" => Language::TypeScript,
             "java" => Language::Java,
             "go" => Language::Go,
-            "rb" => Language::Ruby, // Added Ruby extension mapping
+            "rb" => Language::Ruby,
             _ => Language::Other,
         }
     }
@@ -237,13 +237,13 @@ impl SecurityRiskPatterns {
             // Unsafe
             r#"\bunsafe\."#,
             ],
-        ); // Correctly terminate Go block insert
-        map.insert( // Add this block for Ruby
+        );
+        map.insert(
             Ruby,
             vec![
                 r#"\beval\s*\("#,
                 r#"\bsystem\s*\("#,
-                r#"`.*`"#, // Backticks for command execution
+                r#"`.*`"#,
                 r#"Kernel\.exec"#,
                 r#"IO\.popen"#,
                 r#"File\.open\s*\("#,
@@ -260,14 +260,14 @@ impl SecurityRiskPatterns {
                 r#"DBI\.connect"#,
                 r#"ActiveRecord::Base\.connection\.execute"#,
                 r#"find_by_sql"#,
-                r#"params\["#, // Common source of user input in web frameworks
+                r#"params\["#,
                 r#"render\s+inline:"#,
                 r#"render\s+text:"#,
                 r#"send_file"#,
                 r#"send_data"#,
-                r#"redirect_to"#, // Potential open redirect
+                r#"redirect_to"#,
             ],
-        ); // Correctly terminate Ruby block insert
+        );
         map.insert(
             Other,
             vec![
