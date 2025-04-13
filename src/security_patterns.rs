@@ -9,6 +9,7 @@ pub enum Language {
     TypeScript,
     Java,
     Go,
+    Ruby,
     Other,
 }
 
@@ -21,6 +22,7 @@ impl Language {
             "ts" => Language::TypeScript,
             "java" => Language::Java,
             "go" => Language::Go,
+            "rb" => Language::Ruby,
             _ => Language::Other,
         }
     }
@@ -234,6 +236,36 @@ impl SecurityRiskPatterns {
             r#"\bhttp\.Get\s*\("#,
             // Unsafe
             r#"\bunsafe\."#,
+            ],
+        );
+        map.insert(
+            Ruby,
+            vec![
+                r#"\beval\s*\("#,
+                r#"\bsystem\s*\("#,
+                r#"`.*`"#,
+                r#"Kernel\.exec"#,
+                r#"IO\.popen"#,
+                r#"File\.open\s*\("#,
+                r#"File\.read\s*\("#,
+                r#"File\.write\s*\("#,
+                r#"Dir\.glob\s*\("#,
+                r#"Net::HTTP"#,
+                r#"OpenURI"#,
+                r#"Socket"#,
+                r#"TCPSocket"#,
+                r#"UDPSocket"#,
+                r#"Marshal\.load"#,
+                r#"YAML\.load"#,
+                r#"DBI\.connect"#,
+                r#"ActiveRecord::Base\.connection\.execute"#,
+                r#"find_by_sql"#,
+                r#"params\["#,
+                r#"render\s+inline:"#,
+                r#"render\s+text:"#,
+                r#"send_file"#,
+                r#"send_data"#,
+                r#"redirect_to"#,
             ],
         );
         map.insert(

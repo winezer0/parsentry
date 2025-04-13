@@ -15,6 +15,8 @@ extern "C" {
     fn tree_sitter_tsx() -> Language;
     fn tree_sitter_java() -> Language;
     fn tree_sitter_go() -> Language;
+    fn tree_sitter_ruby() -> Language;
+
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +70,7 @@ impl CodeParser {
             Some("java") => Some(unsafe { tree_sitter_java() }),
             Some("rs") => Some(unsafe { tree_sitter_rust() }),
             Some("go") => Some(unsafe { tree_sitter_go() }),
+            Some("rb") => Some(unsafe { tree_sitter_ruby() }),
             _ => None,
         }
     }
@@ -86,6 +89,8 @@ impl CodeParser {
             "java"
         } else if language == &unsafe { tree_sitter_rust() } {
             "rust"
+        } else if language == &unsafe { tree_sitter_ruby() } {
+            "ruby"
         } else {
             return Err(anyhow!("クエリに対応していない言語です"));
         };
