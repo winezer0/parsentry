@@ -61,20 +61,17 @@ async fn main() -> Result<()> {
     let root_dir = if let Some(repo) = &args.repo {
         // クローン先ディレクトリ名を決定（例: "repo"）
         let dest = PathBuf::from("repo");
-        if !dest.exists() {
-            println!(
-                "🛠️  GitHubリポジトリをクローン中: {} → {}",
-                repo,
-                dest.display()
-            );
-            clone_github_repo(repo, &dest)
-                .map_err(|e| anyhow::anyhow!("GitHubリポジトリのクローンに失敗: {}", e))?;
-        } else {
-            println!(
-                "⚠️  既にクローン済みディレクトリが存在します: {}",
-                dest.display()
-            );
+        if dest.exists() {
+            std::fs::remove_dir_all(&dest)
+                .map_err(|e| anyhow::anyhow!("クローン先ディレクトリの削除に失敗: {}", e))?;
         }
+        println!(
+            "🛠️  GitHubリポジトリをクローン中: {} → {}",
+            repo,
+            dest.display()
+        );
+        clone_github_repo(repo, &dest)
+            .map_err(|e| anyhow::anyhow!("GitHubリポジトリのクローンに失敗: {}", e))?;
         dest
     } else if let Some(root) = &args.root {
         root.clone()
