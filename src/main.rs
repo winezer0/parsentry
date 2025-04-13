@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
         panic!("root path or repo must be set");
     };
 
-    let mut repo = RepoOps::new(root_dir.clone());
+    let repo = RepoOps::new(root_dir.clone());
 
     println!("🔍 Vulnhuntrs - セキュリティ解析ツール");
 

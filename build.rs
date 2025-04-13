@@ -74,6 +74,16 @@ fn main() {
         .flag("-Wno-unused-parameter")
         .compile("tree-sitter-tsx");
 
+
+    cc::Build::new()
+        .include(&dir)
+        .include(&tree_sitter_dir)
+        .file(dir.join("tree-sitter-ruby/src/parser.c"))
+        .file(dir.join("tree-sitter-ruby/src/scanner.c")) // Assuming scanner.c exists, like Python/JS/Rust/TS
+        .flag("-Wno-unused-parameter")
+        .compile("tree-sitter-ruby");
+
+
     // Add library search path
     println!("cargo:rustc-link-search=native={}", out_dir.display());
 }
