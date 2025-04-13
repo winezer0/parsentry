@@ -87,6 +87,9 @@ impl CodeParser {
             "typescript"
         } else if language == &unsafe { tree_sitter_java() } {
             "java"
+        }
+        else if language == &unsafe { tree_sitter_go() } {
+            "go"
         } else if language == &unsafe { tree_sitter_rust() } {
             "rust"
         } else if language == &unsafe { tree_sitter_ruby() } {
