@@ -244,7 +244,7 @@ pub async fn analyze_file(
             }
         }
     }
-    if response.confidence_score > 0 && response.confidence_score < 95 {
+    if response.confidence_score > 0 && response.confidence_score < 80 {
         warn!(
             "信頼度スコア({})が低いため、{}は脆弱性が見つかりませんでした",
             response.confidence_score,
