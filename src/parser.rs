@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
-extern "C" {
+unsafe extern "C" {
     fn tree_sitter_rust() -> tree_sitter::Language;
 }
 use tree_sitter::{Language, Node, Parser, Query, QueryCursor};
 
-extern "C" {
+unsafe extern "C" {
     fn tree_sitter_python() -> Language;
     fn tree_sitter_javascript() -> Language;
     fn tree_sitter_typescript() -> Language;
