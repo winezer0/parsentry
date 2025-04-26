@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum VulnType {
@@ -71,6 +73,25 @@ impl Response {
         println!("\n📝 解析レポート");
         println!("{}", "=".repeat(80));
 
+        let confidence_icon = match self.confidence_score {
+            90..=100 => "🔴 高",
+            70..=89 => "🟠 中高",
+            50..=69 => "🟡 中",
+            30..=49 => "🟢 中低",
+            _ => "🔵 低",
+        };
+        println!(
+            "\n🎯 信頼度スコア: {} ({})",
+            self.confidence_score, confidence_icon
+        );
+
+        if !self.vulnerability_types.is_empty() {
+            println!("\n⚠️ 脆弱性タイプ:");
+            for vuln_type in &self.vulnerability_types {
+                println!("  - {:?}", vuln_type);
+            }
+        }
+
         println!("\n🔍 解析結果:");
         println!("{}", "-".repeat(80));
         println!("{}", self.analysis);
@@ -107,6 +128,26 @@ impl Response {
         let mut md = String::new();
         md.push_str("# 解析レポート\n\n");
 
+        let confidence_badge = match self.confidence_score {
+            90..=100 => "![高信頼度](https://img.shields.io/badge/信頼度-高-red)",
+            70..=89 => "![中高信頼度](https://img.shields.io/badge/信頼度-中高-orange)",
+            50..=69 => "![中信頼度](https://img.shields.io/badge/信頼度-中-yellow)",
+            30..=49 => "![中低信頼度](https://img.shields.io/badge/信頼度-中低-green)",
+            _ => "![低信頼度](https://img.shields.io/badge/信頼度-低-blue)",
+        };
+        md.push_str(&format!(
+            "{} **信頼度スコア: {}**\n\n",
+            confidence_badge, self.confidence_score
+        ));
+
+        if !self.vulnerability_types.is_empty() {
+            md.push_str("## 脆弱性タイプ\n\n");
+            for vuln_type in &self.vulnerability_types {
+                md.push_str(&format!("- `{:?}`\n", vuln_type));
+            }
+            md.push_str("\n");
+        }
+
         md.push_str("## 解析結果\n\n");
         md.push_str(&self.analysis);
         md.push_str("\n\n");
@@ -134,6 +175,131 @@ impl Response {
             md.push_str("## 解析ノート\n\n");
             md.push_str(&self.scratchpad);
             md.push_str("\n\n");
+        }
+
+        md
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FileAnalysisResult {
+    pub file_path: PathBuf,
+    pub response: Response,
+}
+
+#[derive(Debug, Clone)]
+pub struct AnalysisSummary {
+    pub results: Vec<FileAnalysisResult>,
+}
+
+impl AnalysisSummary {
+    pub fn new() -> Self {
+        Self {
+            results: Vec::new(),
+        }
+    }
+
+    pub fn add_result(&mut self, file_path: PathBuf, response: Response) {
+        self.results.push(FileAnalysisResult {
+            file_path,
+            response,
+        });
+    }
+
+    pub fn sort_by_confidence(&mut self) {
+        self.results.sort_by(|a, b| {
+            b.response
+                .confidence_score
+                .cmp(&a.response.confidence_score)
+        });
+    }
+
+    pub fn filter_by_min_confidence(&self, min_score: i32) -> Self {
+        Self {
+            results: self
+                .results
+                .iter()
+                .filter(|r| r.response.confidence_score >= min_score)
+                .cloned()
+                .collect(),
+        }
+    }
+
+    pub fn filter_by_vuln_types(&self, vuln_types: &[VulnType]) -> Self {
+        Self {
+            results: self
+                .results
+                .iter()
+                .filter(|r| {
+                    r.response
+                        .vulnerability_types
+                        .iter()
+                        .any(|vt| vuln_types.contains(vt))
+                })
+                .cloned()
+                .collect(),
+        }
+    }
+
+    pub fn to_markdown(&self) -> String {
+        let mut md = String::new();
+        md.push_str("# 脆弱性解析サマリーレポート\n\n");
+
+        md.push_str("## 概要\n\n");
+        md.push_str("| ファイル | 脆弱性タイプ | 信頼度 | 重要度 |\n");
+        md.push_str("|---------|------------|--------|--------|\n");
+
+        for result in &self.results {
+            if result.response.confidence_score > 0 {
+                let confidence_level = match result.response.confidence_score {
+                    90..=100 => "🔴 高",
+                    70..=89 => "🟠 中高",
+                    50..=69 => "🟡 中",
+                    30..=49 => "🟢 中低",
+                    _ => "🔵 低",
+                };
+
+                let vuln_types = result
+                    .response
+                    .vulnerability_types
+                    .iter()
+                    .map(|vt| format!("{:?}", vt))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                md.push_str(&format!(
+                    "| [{}]({}.md) | {} | {} | {} |\n",
+                    result
+                        .file_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                    result
+                        .file_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                    vuln_types,
+                    result.response.confidence_score,
+                    confidence_level
+                ));
+            }
+        }
+
+        md.push_str("\n## 脆弱性タイプ別集計\n\n");
+
+        let mut type_count: HashMap<&VulnType, i32> = HashMap::new();
+        for result in &self.results {
+            for vuln_type in &result.response.vulnerability_types {
+                *type_count.entry(vuln_type).or_insert(0) += 1;
+            }
+        }
+
+        md.push_str("| 脆弱性タイプ | 件数 |\n");
+        md.push_str("|------------|------|\n");
+
+        for (vuln_type, count) in type_count.iter() {
+            md.push_str(&format!("| {:?} | {} |\n", vuln_type, count));
         }
 
         md

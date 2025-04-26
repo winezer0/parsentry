@@ -114,7 +114,12 @@ pub async fn analyze_file(
     let json_client = create_api_client();
     let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
     debug!("[LLM Response]\n{}", chat_content);
-    let response: Response = parse_json_response(&chat_content)?;
+    let mut response: Response = parse_json_response(&chat_content)?;
+    
+    // 信頼度スコアが0~10の範囲の場合、10倍に変換する
+    if response.confidence_score > 0 && response.confidence_score <= 10 {
+        response.confidence_score *= 10;
+    }
 
     info!("Initial analysis complete");
 
@@ -186,7 +191,12 @@ pub async fn analyze_file(
                 let json_client = create_api_client();
                 let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
                 debug!("[LLM Response]\n{}", chat_content);
-                let vuln_response: Response = parse_json_response(&chat_content)?;
+                let mut vuln_response: Response = parse_json_response(&chat_content)?;
+                
+                // 信頼度スコアが0~10の範囲の場合、10倍に変換する
+                if vuln_response.confidence_score > 0 && vuln_response.confidence_score <= 10 {
+                    vuln_response.confidence_score *= 10;
+                }
 
                 if verbosity > 0 {
                     debug!(
@@ -238,26 +248,11 @@ pub async fn analyze_file(
 
                 previous_analysis = vuln_response.analysis;
 
-                if vuln_response.confidence_score >= 95 {
+                if vuln_response.confidence_score >= 90 {
                     break;
                 }
             }
         }
-    }
-    if response.confidence_score > 0 && response.confidence_score < 80 {
-        warn!(
-            "信頼度スコア({})が低いため、{}は脆弱性が見つかりませんでした",
-            response.confidence_score,
-            file_path.display()
-        );
-        return Ok(Response {
-            scratchpad: "脆弱性は見つかりませんでした".to_string(),
-            analysis: "脆弱性は見つかりませんでした".to_string(),
-            poc: String::new(),
-            confidence_score: 0,
-            vulnerability_types: vec![],
-            context_code: Vec::new(),
-        });
     }
     Ok(response)
 }
