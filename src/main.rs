@@ -248,7 +248,7 @@ async fn main() -> Result<()> {
                 }
             }
         } else {
-            println!("⚠️ サマリーレポートを出力するには --output-dir オプションが必要です");
+            println!("⚠ サマリーレポートを出力するには --output-dir オプションが必要です");
         }
     }
 

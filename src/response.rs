@@ -86,7 +86,7 @@ impl Response {
         );
 
         if !self.vulnerability_types.is_empty() {
-            println!("\n⚠️ 脆弱性タイプ:");
+            println!("\n⚠ 検出された脆弱性タイプ:");️ 脆弱性タイプ:");
             for vuln_type in &self.vulnerability_types {
                 println!("  - {:?}", vuln_type);
             }
