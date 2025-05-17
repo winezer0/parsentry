@@ -109,10 +109,15 @@ async fn main() -> Result<()> {
     }
 
     // SecurityRiskPatternsで該当ファイルを特定
-    let patterns = SecurityRiskPatterns::new(Language::Other);
     let mut pattern_files = Vec::new();
     for file_path in &files {
         if let Ok(content) = std::fs::read_to_string(file_path) {
+            let ext = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+            let lang = Language::from_extension(ext);
+            let patterns = SecurityRiskPatterns::new(lang);
             if patterns.matches(&content) {
                 pattern_files.push(file_path.clone());
             }

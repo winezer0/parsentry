@@ -1,5 +1,5 @@
-use crate::security_patterns::SecurityRiskPatterns;
 use anyhow::Result;
+use crate::security_patterns::SecurityRiskPatterns;
 use std::{
     fs::{read_dir, read_to_string, File},
     io::{BufRead, BufReader, Result as IoResult},
@@ -14,7 +14,6 @@ pub struct RepoOps {
     repo_path: PathBuf,
     gitignore_patterns: Vec<String>,
     language_exclusions: LanguageExclusions,
-    security_patterns: Option<SecurityRiskPatterns>,
     supported_extensions: Vec<String>,
     code_parser: crate::parser::CodeParser,
     parser_initialized: bool,
@@ -39,17 +38,13 @@ impl RepoOps {
             "rs".to_string(),
             "go".to_string(),
             "java".to_string(),
+            "rb".to_string(),
         ];
-
-        let security_patterns = Some(SecurityRiskPatterns::new(
-            crate::security_patterns::Language::Other,
-        ));
 
         Self {
             repo_path,
             gitignore_patterns,
             language_exclusions,
-            security_patterns,
             supported_extensions,
             code_parser,
             parser_initialized: false,
@@ -171,14 +166,16 @@ impl RepoOps {
 
     /// ネットワーク関連パターンに該当するファイル一覧を返す。
     pub fn get_network_related_files(&self, files: &[PathBuf]) -> Vec<PathBuf> {
-        let Some(security_patterns) = &self.security_patterns else {
-            return Vec::new();
-        };
-
         let mut network_files = Vec::new();
         for file_path in files {
             if let Ok(content) = read_to_string(file_path) {
-                if security_patterns.matches(&content) {
+                let ext = file_path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                let lang = crate::security_patterns::Language::from_extension(ext);
+                let patterns = SecurityRiskPatterns::new(lang);
+                if patterns.matches(&content) {
                     network_files.push(file_path.clone());
                 }
             }

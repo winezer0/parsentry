@@ -14,6 +14,7 @@ Vulnhuntrs is a security analysis tool designed to detect vulnerabilities in app
 
 - Static code analysis for security vulnerabilities
 - Multi-language support
+  - Supports Rust, Python, JavaScript, TypeScript, Go, Java, and Ruby.
 - Detailed vulnerability reports
 - Example vulnerable applications for testing
 
