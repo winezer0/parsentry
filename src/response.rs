@@ -86,7 +86,7 @@ impl Response {
         );
 
         if !self.vulnerability_types.is_empty() {
-            println!("\n⚠ 検出された脆弱性タイプ:");️ 脆弱性タイプ:");
+            println!("\n⚠ 検出された脆弱性タイプ:");
             for vuln_type in &self.vulnerability_types {
                 println!("  - {:?}", vuln_type);
             }
@@ -97,7 +97,7 @@ impl Response {
         println!("{}", self.analysis);
 
         if !self.poc.is_empty() {
-            println!("\n🔨 PoC（概念実証コード）:");
+            println!("\n🔨 PoC(概念実証コード):");
             println!("{}", "-".repeat(80));
             println!("{}", self.poc);
         }
