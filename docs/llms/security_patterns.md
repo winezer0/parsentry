@@ -1,6 +1,6 @@
 # Security Patterns
 
-This document outlines the regular expression patterns used in `src/security_patterns.rs` to identify potentially security-relevant code sections across different languages. These patterns help focus the analysis but are not exhaustive and serve as initial indicators rather than definitive proof of vulnerabilities.
+This document outlines the regular expression patterns defined in `security_patterns/patterns.yml` (loaded by `src/security_patterns.rs`) to identify potentially security-relevant code sections across different languages. These patterns help focus the analysis but are not exhaustive and serve as initial indicators rather than definitive proof of vulnerabilities.
 
 ## Purpose
 
@@ -11,7 +11,7 @@ The `SecurityRiskPatterns` struct holds a collection of regex patterns designed 
 - Command execution
 - Network API calls
 
-## Defined Patterns (Examples from `src/security_patterns.rs`)
+## Defined Patterns (Examples from `security_patterns/patterns.yml`)
 
 *Note: This is a representative sample, not the complete list.*
 

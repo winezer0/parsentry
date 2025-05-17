@@ -10,7 +10,7 @@
 
 ## 3. Rust側の対応
 - `Cargo.toml`にtree-sitter-<lang>依存を追加。
-- `src/security_patterns.rs`のLanguage enum、from_extension、pattern_map()に新言語を追加。
+- `src/security_patterns.rs`のLanguage enumとfrom_extensionに新言語を追加し、`security_patterns/patterns.yml`に対応パターンを記述。
 - `src/parser.rs`のget_languageやget_query_path等で新言語対応を追加。
 
 ## 4. テスト追加
