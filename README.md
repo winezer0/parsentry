@@ -84,4 +84,4 @@ AGPL 3.0
 
 ## Acknowledgements
 
-This project was inspired by [protectai/vulnhunter](https://github.com/protectai/vulnhuntr).
+This project was inspired by [protectai/vulnhuntr](https://github.com/protectai/vulnhuntr).
