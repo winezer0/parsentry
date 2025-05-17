@@ -125,7 +125,11 @@ impl RepoOps {
     }
 
     /// パスが.gitignoreパターンに一致するか判定する。
-    fn matches_gitignore_pattern(path: &str, pattern: &str) -> bool {
+    /// Determine if a path matches a .gitignore style pattern.
+    ///
+    /// The function is public so that integration tests can verify the
+    /// behaviour of pattern matching.
+    pub fn matches_gitignore_pattern(path: &str, pattern: &str) -> bool {
         let pattern = pattern.trim_start_matches('/');
         let path = path.trim_start_matches('/');
 
@@ -133,6 +137,13 @@ impl RepoOps {
             path.ends_with(&pattern[1..])
         } else if pattern.ends_with('*') {
             path.starts_with(&pattern[..pattern.len() - 1])
+        } else if !pattern.contains('/') {
+            if path == pattern {
+                true
+            } else {
+                path.split('/')
+                    .any(|segment| segment == pattern)
+            }
         } else {
             path == pattern || path.starts_with(&format!("{}/", pattern))
         }
