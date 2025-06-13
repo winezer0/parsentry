@@ -1,0 +1,51 @@
+name: Build Parsentry for Windows (GNU)
+
+on:
+  workflow_dispatch:
+    inputs:
+      remark:
+        description: 'Remarks information, used for identifying this build.'
+        required: false
+        default: ''
+
+run-name: ${{ github.event.inputs.remark }}
+
+jobs:
+  build_windows_gnu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Rust (stable)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Add Windows GNU target
+        run: |
+          rustup target add x86_64-pc-windows-gnu
+
+      - name: Install mingw-w64 toolchain (required for gnu target)
+        run: |
+          sudo apt update
+          sudo apt install -y mingw-w64
+
+      - name: Build with cargo (Windows GNU)
+        run: |
+          cargo build --release --target x86_64-pc-windows-gnu
+
+      - name: Check binary exists
+        run: |
+          if [ ! -f "target/x86_64-pc-windows-gnu/release/parsentry.exe" ]; then
+            echo "Binary not found!" >&2
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: parsentry-windows-gnu-release
+          path: target/x86_64-pc-windows-gnu/release/parsentry.exe
