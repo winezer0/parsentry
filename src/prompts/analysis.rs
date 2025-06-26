@@ -1,4 +1,4 @@
-use crate::language::Language;
+use crate::locales::Language;
 use crate::locales;
 use crate::response::VulnType;
 use std::collections::HashMap;
@@ -118,3 +118,4 @@ pub mod vuln_specific {
         map
     }
 }
+

@@ -1,4 +1,5 @@
-use parsentry::response::{AnalysisSummary, ParAnalysis, RemediationGuidance, Response, VulnType};
+use parsentry::response::{ParAnalysis, RemediationGuidance, Response, VulnType};
+use parsentry::reports::AnalysisSummary;
 use std::path::PathBuf;
 
 #[test]
@@ -69,6 +70,10 @@ fn test_analysis_summary_creation() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
     let response2 = Response {
@@ -86,11 +91,15 @@ fn test_analysis_summary_creation() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
     // Add results to summary
-    summary.add_result(PathBuf::from("/test/file1.py"), response1);
-    summary.add_result(PathBuf::from("/test/file2.py"), response2);
+    summary.add_result(PathBuf::from("/test/file1.py"), response1, "file1.py.md".to_string());
+    summary.add_result(PathBuf::from("/test/file2.py"), response2, "file2.py.md".to_string());
 
     assert_eq!(summary.results.len(), 2);
     assert_eq!(summary.results[0].response.confidence_score, 8);
@@ -117,6 +126,10 @@ fn test_analysis_summary_filtering_by_confidence() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
     let low_confidence = Response {
@@ -134,10 +147,14 @@ fn test_analysis_summary_filtering_by_confidence() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
-    summary.add_result(PathBuf::from("/test/high.py"), high_confidence);
-    summary.add_result(PathBuf::from("/test/low.py"), low_confidence);
+    summary.add_result(PathBuf::from("/test/high.py"), high_confidence, "high.py.md".to_string());
+    summary.add_result(PathBuf::from("/test/low.py"), low_confidence, "low.py.md".to_string());
 
     // Filter by minimum confidence 5
     let filtered = summary.filter_by_min_confidence(5);
@@ -165,6 +182,10 @@ fn test_analysis_summary_filtering_by_vuln_types() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
     let sqli_response = Response {
@@ -182,6 +203,10 @@ fn test_analysis_summary_filtering_by_vuln_types() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
     let xss_response = Response {
@@ -199,11 +224,15 @@ fn test_analysis_summary_filtering_by_vuln_types() {
         remediation_guidance: RemediationGuidance {
             policy_enforcement: vec![],
         },
+        file_path: None,
+        pattern_description: None,
+        matched_source_code: None,
+        full_source_code: None,
     };
 
-    summary.add_result(PathBuf::from("/test/rce.py"), rce_response);
-    summary.add_result(PathBuf::from("/test/sqli.py"), sqli_response);
-    summary.add_result(PathBuf::from("/test/xss.py"), xss_response);
+    summary.add_result(PathBuf::from("/test/rce.py"), rce_response, "rce.py.md".to_string());
+    summary.add_result(PathBuf::from("/test/sqli.py"), sqli_response, "sqli.py.md".to_string());
+    summary.add_result(PathBuf::from("/test/xss.py"), xss_response, "xss.py.md".to_string());
 
     // Filter by specific vulnerability types
     let filter_types = vec![VulnType::RCE, VulnType::SQLI];
@@ -258,8 +287,12 @@ fn test_analysis_summary_sorting_by_confidence() {
             remediation_guidance: RemediationGuidance {
                 policy_enforcement: vec![],
             },
+            file_path: None,
+            pattern_description: None,
+            matched_source_code: None,
+            full_source_code: None,
         };
-        summary.add_result(path, response);
+        summary.add_result(path, response, format!("{}.md", confidence));
     }
 
     summary.sort_by_confidence();

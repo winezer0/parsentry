@@ -1,0 +1,94 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Parsentry",
+          "version": "0.7.0",
+          "information_uri": "https://github.com/HikaruEgashira/vulnhuntrs",
+          "rules": [
+            {
+              "id": "SSRF",
+              "name": "Server-Side Request Forgery",
+              "short_description": {
+                "text": "Potential SSRF vulnerability detected"
+              },
+              "full_description": {
+                "text": "Potential SSRF vulnerability detected",
+                "markdown": "**Server-Side Request Forgery**\n\nSSRF allows attackers to make requests from the server. Validate and restrict URLs."
+              },
+              "help": {
+                "text": "SSRF allows attackers to make requests from the server. Validate and restrict URLs.",
+                "markdown": "SSRF allows attackers to make requests from the server. Validate and restrict URLs."
+              },
+              "properties": {
+                "tags": [
+                  "security",
+                  "network",
+                  "ssrf"
+                ],
+                "precision": "medium",
+                "problem_severity": "7.0",
+                "security_severity": "7.0"
+              },
+              "default_configuration": {
+                "level": "warning"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "SSRF",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "SSRF: 本コードではHTTP GETパラメータ“url”を検証せずにfile_get_contentsで直接フェッチしており、任意の外部／内部リソースへのリクエストが可能です。SSRF攻撃により内部システム情報の漏洩や不正操作が発生する恐れがあります。",
+            "markdown": "本コードではHTTP GETパラメータ“url”を検証せずにfile_get_contentsで直接フェッチしており、任意の外部／内部リソースへのリクエストが可能です。SSRF攻撃により内部システム情報の漏洩や不正操作が発生する恐れがあります。"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "repo/benchmarks/XBEN-020-24/ssrf-demo-app/redirect.php",
+                  "index": 0
+                }
+              }
+            }
+          ],
+          "fingerprints": {
+            "parsentry/v1": "a8c044d4c06c4fe1",
+            "vulnerability/type": "SSRF"
+          },
+          "properties": {
+            "confidence": 0.8,
+            "mitre_attack": [
+              "T1090"
+            ],
+            "cwe": [
+              "CWE-918"
+            ],
+            "owasp": [
+              "A10:2021-Server-Side Request Forgery"
+            ]
+          }
+        }
+      ],
+      "artifacts": [
+        {
+          "location": {
+            "uri": "repo/benchmarks/XBEN-020-24/ssrf-demo-app/redirect.php",
+            "index": 0
+          },
+          "mime_type": "text/plain"
+        }
+      ],
+      "invocation": {
+        "executionSuccessful": true
+      }
+    }
+  ]
+}

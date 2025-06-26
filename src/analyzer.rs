@@ -11,11 +11,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::timeout;
 
-use crate::language::Language;
+use crate::locales::Language;
 use crate::parser::CodeParser;
 use crate::prompts::{self, vuln_specific};
 use crate::response::{Response, response_json_schema};
-use crate::security_patterns::{PatternType, SecurityRiskPatterns};
+use crate::security_patterns::{PatternType, SecurityRiskPatterns, PatternMatch};
 
 fn save_debug_file(
     output_dir: &Option<PathBuf>,
@@ -66,22 +66,32 @@ fn create_api_client(api_base_url: Option<&str>) -> Client {
 
 fn create_custom_target_resolver(base_url: &str) -> ServiceTargetResolver {
     let base_url_owned = base_url.to_string();
+    let disable_v1_path = std::env::var("PARSENTRY_DISABLE_V1_PATH").is_ok();
 
     ServiceTargetResolver::from_resolver_fn(
         move |service_target: ServiceTarget| -> Result<ServiceTarget, genai::resolver::Error> {
             let ServiceTarget { model, .. } = service_target;
 
-            // OpenAI adapter automatically adds /v1/chat/completions, so we need to provide base URL only
-            // The adapter will construct: base_url + /v1/chat/completions
-            // So we provide the base URL without any path to get the desired result
-            println!(
-                "🔍 Debug: Base URL provided to OpenAI adapter: {}",
-                base_url_owned
-            );
-            let endpoint = Endpoint::from_owned(base_url_owned.clone());
+            // Check if we should use a different adapter to avoid /v1 path appending
+            let (adapter_kind, final_endpoint) = if disable_v1_path {
+                // Use Groq adapter which doesn't append /v1/chat/completions
+                // This allows us to use the full URL as-is
+                println!(
+                    "🔍 Debug: Using Groq adapter (PARSENTRY_DISABLE_V1_PATH=true) with URL: {}",
+                    base_url_owned
+                );
+                (AdapterKind::Groq, base_url_owned.clone())
+            } else {
+                // Default behavior: OpenAI adapter automatically adds /v1/chat/completions
+                println!(
+                    "🔍 Debug: Using OpenAI adapter with base URL: {}",
+                    base_url_owned
+                );
+                (AdapterKind::OpenAI, base_url_owned.clone())
+            };
 
-            // Use OpenAI adapter but with custom endpoint that already includes the full path
-            let model = ModelIden::new(AdapterKind::OpenAI, model.model_name);
+            let endpoint = Endpoint::from_owned(final_endpoint);
+            let model = ModelIden::new(adapter_kind, model.model_name);
 
             // Use the OPENAI_API_KEY environment variable as the new key when using custom URL
             let auth = AuthData::from_env("OPENAI_API_KEY");
@@ -195,6 +205,31 @@ pub async fn analyze_file(
     }
 
     let content = std::fs::read_to_string(file_path)?;
+    
+    // Skip files with more than 50,000 characters
+    if content.len() > 50_000 {
+        return Ok(Response {
+            scratchpad: String::new(),
+            analysis: String::new(),
+            poc: String::new(),
+            confidence_score: 0,
+            vulnerability_types: vec![],
+            par_analysis: crate::response::ParAnalysis {
+                principals: vec![],
+                actions: vec![],
+                resources: vec![],
+                policy_violations: vec![],
+            },
+            remediation_guidance: crate::response::RemediationGuidance {
+                policy_enforcement: vec![],
+            },
+            file_path: Some(file_path.to_string_lossy().to_string()),
+            pattern_description: Some("File too large for analysis".to_string()),
+            matched_source_code: None,
+            full_source_code: None,
+        });
+    }
+    
     if content.is_empty() {
         return Ok(Response {
             scratchpad: String::new(),
@@ -211,6 +246,10 @@ pub async fn analyze_file(
             remediation_guidance: crate::response::RemediationGuidance {
                 policy_enforcement: vec![],
             },
+            file_path: Some(file_path.to_string_lossy().to_string()),
+            pattern_description: Some("Empty file analysis".to_string()),
+            matched_source_code: None,
+            full_source_code: Some(String::new()),
         });
     }
 
@@ -509,5 +548,181 @@ pub async fn analyze_file(
             }
         }
     }
+    
+    // Add enhanced report information to response
+    response.file_path = Some(file_path.to_string_lossy().to_string());
+    response.full_source_code = Some(content);
+    // For file-based analysis, no specific pattern or matched code
+    response.pattern_description = Some("Full file analysis".to_string());
+    response.matched_source_code = None;
+    
     Ok(response)
+}
+
+pub async fn analyze_pattern(
+    file_path: &PathBuf,
+    pattern_match: &PatternMatch,
+    model: &str,
+    files: &[PathBuf],
+    _verbosity: u8,
+    min_confidence: i32,
+    debug: bool,
+    output_dir: &Option<PathBuf>,
+    api_base_url: Option<&str>,
+    language: &Language,
+) -> Result<Option<Response>, Error> {
+    info!(
+        "Analyzing pattern '{}' in file {}",
+        pattern_match.pattern_config.description,
+        file_path.display()
+    );
+
+    let mut parser = CodeParser::new()?;
+
+    // Add files for context parsing
+    for file in files {
+        if let Err(e) = parser.add_file(file) {
+            warn!(
+                "Failed to add file to parser {}: {}. Skipping file.",
+                file.display(),
+                e
+            );
+        }
+    }
+
+    let content = std::fs::read_to_string(file_path)?;
+    
+    // Skip files with more than 50,000 characters
+    if content.len() > 50_000 {
+        return Ok(None);
+    }
+    
+    // Extract context from file
+    let context = parser.build_context_from_file(file_path)?;
+
+    // Build pattern-specific prompt
+    let pattern_context = format!(
+        "Pattern Type: {:?}\nPattern Description: {}\nMatched Code: {}\nAttack Vectors: {}",
+        pattern_match.pattern_type,
+        pattern_match.pattern_config.description,
+        pattern_match.matched_text,
+        pattern_match.pattern_config.attack_vector.join(", ")
+    );
+
+    let mut context_text = String::new();
+    if !context.definitions.is_empty() {
+        context_text.push_str("\nContext Definitions:\n");
+        for def in &context.definitions {
+            context_text.push_str(&format!(
+                "\nFunction/Definition: {}\nCode:\n{}\n",
+                def.name, def.source
+            ));
+        }
+    }
+
+    let prompt = format!(
+        "File: {}\n\nPattern Analysis:\n{}\n\nFull File Content:\n{}\n{}\n\n{}\n{}\n{}",
+        file_path.display(),
+        pattern_context,
+        content,
+        context_text,
+        prompts::get_initial_analysis_prompt_template(language),
+        prompts::get_analysis_approach_template(language),
+        prompts::get_guidelines_template(language)
+    );
+
+    debug!("[PATTERN-BASED PROMPT]\n{}", prompt);
+
+    // Save debug input if debug mode is enabled
+    if debug {
+        let debug_content = format!(
+            "=== PATTERN-BASED ANALYSIS PROMPT ===\nModel: {}\nFile: {}\nPattern: {}\nTimestamp: {}\n\n{}",
+            model,
+            file_path.display(),
+            pattern_match.pattern_config.description,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            prompt
+        );
+        if let Err(e) = save_debug_file(
+            output_dir,
+            file_path,
+            &format!("pattern_{}_prompt", pattern_match.pattern_config.description.replace(" ", "_")),
+            &debug_content,
+        ) {
+            warn!("Failed to save debug input file: {}", e);
+        }
+    }
+
+    let chat_req = ChatRequest::new(vec![
+        ChatMessage::system(
+            "You are a security vulnerability analyzer. You must reply with exactly one JSON object that matches the PAR analysis schema with scratchpad, analysis, poc, confidence_score, vulnerability_types, par_analysis (with principals, actions, resources, policy_violations), and remediation_guidance fields. Do not include any explanatory text outside the JSON object.",
+        ),
+        ChatMessage::user(&prompt),
+    ]);
+
+    let json_client = create_api_client(api_base_url);
+    let chat_content = execute_chat_request(&json_client, model, chat_req).await?;
+    debug!("[PATTERN LLM Response]\n{}", chat_content);
+
+    // Save debug output if debug mode is enabled
+    if debug {
+        let debug_content = format!(
+            "=== PATTERN-BASED ANALYSIS RESPONSE ===\nModel: {}\nFile: {}\nPattern: {}\nTimestamp: {}\n\n{}",
+            model,
+            file_path.display(),
+            pattern_match.pattern_config.description,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            chat_content
+        );
+        if let Err(e) = save_debug_file(
+            output_dir,
+            file_path,
+            &format!("pattern_{}_response", pattern_match.pattern_config.description.replace(" ", "_")),
+            &debug_content,
+        ) {
+            warn!("Failed to save debug output file: {}", e);
+        }
+    }
+
+    let mut response: Response = parse_json_response(&chat_content)?;
+
+    response.confidence_score =
+        crate::response::Response::normalize_confidence_score(response.confidence_score);
+
+    // Clean up and validate the response
+    response.sanitize();
+
+    // Add pattern-specific metadata to response
+    if response.confidence_score >= min_confidence {
+        // Enhance response with pattern information
+        response.par_analysis.policy_violations.iter_mut().for_each(|violation| {
+            if !violation.rule_description.contains(&pattern_match.pattern_config.description) {
+                violation.rule_description = format!(
+                    "{} (Pattern: {})",
+                    violation.rule_description,
+                    pattern_match.pattern_config.description
+                );
+            }
+        });
+    }
+
+    // Add enhanced report information to response
+    response.file_path = Some(file_path.to_string_lossy().to_string());
+    response.pattern_description = Some(pattern_match.pattern_config.description.clone());
+    response.matched_source_code = Some(pattern_match.matched_text.clone());
+    response.full_source_code = Some(content);
+
+    info!(
+        "Pattern analysis complete for '{}' with confidence: {}",
+        pattern_match.pattern_config.description,
+        response.confidence_score
+    );
+
+    Ok(Some(response))
 }

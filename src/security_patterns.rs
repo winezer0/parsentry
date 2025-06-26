@@ -1,7 +1,22 @@
-use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
+use tree_sitter::{Language as TreeSitterLanguage, Query, QueryCursor, Parser};
+use streaming_iterator::StreamingIterator;
+
+unsafe extern "C" {
+    fn tree_sitter_c() -> tree_sitter::Language;
+    fn tree_sitter_cpp() -> tree_sitter::Language;
+    fn tree_sitter_python() -> tree_sitter::Language;
+    fn tree_sitter_javascript() -> tree_sitter::Language;
+    fn tree_sitter_typescript() -> tree_sitter::Language;
+    fn tree_sitter_java() -> tree_sitter::Language;
+    fn tree_sitter_go() -> tree_sitter::Language;
+    fn tree_sitter_ruby() -> tree_sitter::Language;
+    fn tree_sitter_rust() -> tree_sitter::Language;
+    fn tree_sitter_hcl() -> tree_sitter::Language;
+    fn tree_sitter_php() -> tree_sitter::Language;
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Language {
@@ -66,9 +81,17 @@ pub enum PatternType {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PatternConfig {
-    pub pattern: String,
+    #[serde(flatten)]
+    pub pattern_type: PatternQuery,
     pub description: String,
     pub attack_vector: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum PatternQuery {
+    Definition { definition: String },
+    Reference { reference: String },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,11 +102,23 @@ pub struct LanguagePatterns {
 }
 
 pub struct SecurityRiskPatterns {
-    principal_patterns: Vec<Regex>, // Who patterns
-    action_patterns: Vec<Regex>,    // What patterns
-    resource_patterns: Vec<Regex>,  // Where patterns
-    pattern_type_map: HashMap<String, PatternType>,
-    attack_vector_map: HashMap<String, Vec<String>>,
+    principal_definition_queries: Vec<Query>,
+    principal_reference_queries: Vec<Query>,
+    action_definition_queries: Vec<Query>,
+    action_reference_queries: Vec<Query>,
+    resource_definition_queries: Vec<Query>,
+    resource_reference_queries: Vec<Query>,
+    language: TreeSitterLanguage,
+    pattern_configs: Vec<PatternConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternMatch {
+    pub pattern_config: PatternConfig,
+    pub pattern_type: PatternType,
+    pub start_byte: usize,
+    pub end_byte: usize,
+    pub matched_text: String,
 }
 
 impl SecurityRiskPatterns {
@@ -102,87 +137,402 @@ impl SecurityRiskPatterns {
                 resources: None,
             });
 
-        let mut principal_patterns = Vec::new();
-        let mut action_patterns = Vec::new();
-        let mut resource_patterns = Vec::new();
-        let mut pattern_type_map = HashMap::new();
-        let mut attack_vector_map = HashMap::new();
+        let ts_language = Self::get_tree_sitter_language(language);
+
+        let mut principal_definition_queries = Vec::new();
+        let mut principal_reference_queries = Vec::new();
+        let mut action_definition_queries = Vec::new();
+        let mut action_reference_queries = Vec::new();
+        let mut resource_definition_queries = Vec::new();
+        let mut resource_reference_queries = Vec::new();
+        let mut pattern_configs = Vec::new();
 
         if let Some(principals) = &lang_patterns.principals {
             for config in principals {
-                let regex = Regex::new(&config.pattern).unwrap();
-                pattern_type_map.insert(config.pattern.clone(), PatternType::Principal);
-                if !config.attack_vector.is_empty() {
-                    attack_vector_map.insert(config.pattern.clone(), config.attack_vector.clone());
+                pattern_configs.push(config.clone());
+                match &config.pattern_type {
+                    PatternQuery::Definition { definition } => {
+                        if let Ok(query) = Query::new(&ts_language, definition) {
+                            principal_definition_queries.push(query);
+                        }
+                    }
+                    PatternQuery::Reference { reference } => {
+                        if let Ok(query) = Query::new(&ts_language, reference) {
+                            principal_reference_queries.push(query);
+                        }
+                    }
                 }
-                principal_patterns.push(regex);
             }
         }
 
         if let Some(actions) = &lang_patterns.actions {
             for config in actions {
-                let regex = Regex::new(&config.pattern).unwrap();
-                pattern_type_map.insert(config.pattern.clone(), PatternType::Action);
-                if !config.attack_vector.is_empty() {
-                    attack_vector_map.insert(config.pattern.clone(), config.attack_vector.clone());
+                pattern_configs.push(config.clone());
+                match &config.pattern_type {
+                    PatternQuery::Definition { definition } => {
+                        if let Ok(query) = Query::new(&ts_language, definition) {
+                            action_definition_queries.push(query);
+                        }
+                    }
+                    PatternQuery::Reference { reference } => {
+                        if let Ok(query) = Query::new(&ts_language, reference) {
+                            action_reference_queries.push(query);
+                        }
+                    }
                 }
-                action_patterns.push(regex);
             }
         }
 
         if let Some(resources) = &lang_patterns.resources {
             for config in resources {
-                let regex = Regex::new(&config.pattern).unwrap();
-                pattern_type_map.insert(config.pattern.clone(), PatternType::Resource);
-                if !config.attack_vector.is_empty() {
-                    attack_vector_map.insert(config.pattern.clone(), config.attack_vector.clone());
+                pattern_configs.push(config.clone());
+                match &config.pattern_type {
+                    PatternQuery::Definition { definition } => {
+                        if let Ok(query) = Query::new(&ts_language, definition) {
+                            resource_definition_queries.push(query);
+                        }
+                    }
+                    PatternQuery::Reference { reference } => {
+                        if let Ok(query) = Query::new(&ts_language, reference) {
+                            resource_reference_queries.push(query);
+                        }
+                    }
                 }
-                resource_patterns.push(regex);
             }
         }
 
         Self {
-            principal_patterns,
-            action_patterns,
-            resource_patterns,
-            pattern_type_map,
-            attack_vector_map,
+            principal_definition_queries,
+            principal_reference_queries,
+            action_definition_queries,
+            action_reference_queries,
+            resource_definition_queries,
+            resource_reference_queries,
+            language: ts_language,
+            pattern_configs,
+        }
+    }
+
+    fn get_tree_sitter_language(language: Language) -> TreeSitterLanguage {
+        unsafe {
+            match language {
+                Language::Python => tree_sitter_python(),
+                Language::JavaScript => tree_sitter_javascript(),
+                Language::TypeScript => tree_sitter_typescript(),
+                Language::Rust => tree_sitter_rust(),
+                Language::Java => tree_sitter_java(),
+                Language::Go => tree_sitter_go(),
+                Language::Ruby => tree_sitter_ruby(),
+                Language::C => tree_sitter_c(),
+                Language::Cpp => tree_sitter_cpp(),
+                Language::Terraform => tree_sitter_hcl(),
+                Language::Php => tree_sitter_php(),
+                _ => tree_sitter_javascript(), // Default fallback
+            }
         }
     }
 
     pub fn matches(&self, content: &str) -> bool {
-        self.principal_patterns
-            .iter()
-            .any(|pattern| pattern.is_match(content))
-            || self
-                .action_patterns
-                .iter()
-                .any(|pattern| pattern.is_match(content))
-            || self
-                .resource_patterns
-                .iter()
-                .any(|pattern| pattern.is_match(content))
-    }
+        let mut parser = Parser::new();
+        parser.set_language(&self.language).unwrap();
+        
+        let tree = match parser.parse(content, None) {
+            Some(tree) => tree,
+            None => return false,
+        };
 
-    pub fn get_pattern_type(&self, content: &str) -> Option<PatternType> {
-        for (pattern_str, pattern_type) in &self.pattern_type_map {
-            let regex = Regex::new(pattern_str).ok()?;
-            if regex.is_match(content) {
-                return Some(pattern_type.clone());
-            }
-        }
-        None
-    }
+        let root_node = tree.root_node();
 
-    pub fn get_attack_vectors(&self, content: &str) -> Vec<String> {
-        for (pattern_str, attack_vectors) in &self.attack_vector_map {
-            if let Ok(regex) = Regex::new(pattern_str) {
-                if regex.is_match(content) {
-                    return attack_vectors.clone();
+        // Check all query types
+        let all_queries = [
+            &self.principal_definition_queries,
+            &self.principal_reference_queries,
+            &self.action_definition_queries,
+            &self.action_reference_queries,
+            &self.resource_definition_queries,
+            &self.resource_reference_queries,
+        ];
+
+        for query_set in all_queries {
+            for query in query_set {
+                let mut cursor = QueryCursor::new();
+                let mut matches = cursor.matches(query, root_node, content.as_bytes());
+                // Check if there are any matches (predicates are already evaluated by tree-sitter)
+                while let Some(match_) = matches.next() {
+                    let mut has_valid_capture = false;
+                    
+                    for capture in match_.captures {
+                        let capture_name = &query.capture_names()[capture.index as usize];
+                        let node = capture.node;
+                        let start_byte = node.start_byte();
+                        let end_byte = node.end_byte();
+                        let matched_text = content[start_byte..end_byte].to_string();
+                        
+                        // Filter out variable names with 2 characters or less
+                        if matched_text.trim().len() <= 2 {
+                            continue;
+                        }
+                        
+                        // For definitions, we want the entire function_definition/class_definition, etc.
+                        // For references, we want the specific call/attribute access
+                        match *capture_name {
+                            "function" | "definition" | "class" | "method_def" | "call" | "expression" | "attribute" => {
+                                // Direct structural captures
+                                has_valid_capture = true;
+                            }
+                            "name" | "func" | "attr" | "obj" | "method" => {
+                                // These are identifier captures - find the parent node
+                                if let Some(parent) = node.parent() {
+                                    if parent.kind().contains("definition") || 
+                                       parent.kind().contains("declaration") ||
+                                       parent.kind().contains("call") ||
+                                       parent.kind().contains("attribute") {
+                                        // Parent node validation passed
+                                    }
+                                }
+                                has_valid_capture = true;
+                            }
+                            _ => {
+                                // Other captures - use as-is
+                                has_valid_capture = true;
+                            }
+                        }
+                    }
+                    
+                    if has_valid_capture {
+                        return true;
+                    }
                 }
             }
         }
+
+        false
+    }
+
+    pub fn get_pattern_type(&self, content: &str) -> Option<PatternType> {
+        let mut parser = Parser::new();
+        parser.set_language(&self.language).unwrap();
+        
+        let tree = match parser.parse(content, None) {
+            Some(tree) => tree,
+            None => return None,
+        };
+
+        let root_node = tree.root_node();
+
+        // Helper function to check if any query matches
+        let check_queries = |queries: &[Query]| -> bool {
+            for query in queries {
+                let mut cursor = QueryCursor::new();
+                let mut matches = cursor.matches(query, root_node, content.as_bytes());
+                while let Some(match_) = matches.next() {
+                    // Check if we have valid captures with sufficient content
+                    for capture in match_.captures {
+                        let node = capture.node;
+                        let start_byte = node.start_byte();
+                        let end_byte = node.end_byte();
+                        let matched_text = content[start_byte..end_byte].to_string();
+                        
+                        // Filter out variable names with 2 characters or less
+                        if matched_text.trim().len() > 2 {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        };
+
+        // Check each pattern type in order
+        if check_queries(&self.principal_definition_queries) || check_queries(&self.principal_reference_queries) {
+            return Some(PatternType::Principal);
+        }
+        
+        if check_queries(&self.action_definition_queries) || check_queries(&self.action_reference_queries) {
+            return Some(PatternType::Action);
+        }
+        
+        if check_queries(&self.resource_definition_queries) || check_queries(&self.resource_reference_queries) {
+            return Some(PatternType::Resource);
+        }
+
+        None
+    }
+
+    pub fn get_attack_vectors(&self, _content: &str) -> Vec<String> {
+        // For now, return empty vector - could be enhanced to map tree-sitter queries to attack vectors
         Vec::new()
+    }
+
+    pub fn get_pattern_matches(&self, content: &str) -> Vec<PatternMatch> {
+        let mut parser = Parser::new();
+        parser.set_language(&self.language).unwrap();
+        
+        let tree = match parser.parse(content, None) {
+            Some(tree) => tree,
+            None => return Vec::new(),
+        };
+
+        let root_node = tree.root_node();
+        let mut pattern_matches = Vec::new();
+        let content_bytes = content.as_bytes();
+
+        // Helper function to process queries and collect matches
+        let mut process_queries = |queries: &[Query], pattern_type: PatternType, _configs: &[PatternConfig], is_definition: bool| {
+            for (query_idx, query) in queries.iter().enumerate() {
+                let mut cursor = QueryCursor::new();
+                let mut matches = cursor.matches(query, root_node, content_bytes);
+                
+                while let Some(match_) = matches.next() {
+                    // Find the best node to capture (full definition/reference context)
+                    let mut best_node = None;
+                    let mut best_text = String::new();
+                    let mut best_priority = 0; // Higher priority = better capture
+                    
+                    for capture in match_.captures {
+                        let capture_name = &query.capture_names()[capture.index as usize];
+                        let node = capture.node;
+                        let start_byte = node.start_byte();
+                        let end_byte = node.end_byte();
+                        let matched_text = content[start_byte..end_byte].to_string();
+                        
+                        // Filter out variable names with 2 characters or less
+                        if matched_text.trim().len() <= 2 {
+                            continue;
+                        }
+                        
+                        // Assign priority and determine best capture based on type and context
+                        let (priority, candidate_node, candidate_text) = match *capture_name {
+                            "function" | "definition" | "class" | "method_def" => {
+                                // Highest priority - direct captures of full definitions
+                                (100, Some(node), matched_text.clone())
+                            }
+                            "call" | "expression" | "attribute" => {
+                                // High priority - direct captures of full expressions  
+                                (90, Some(node), matched_text.clone())
+                            }
+                            "name" | "func" | "attr" | "obj" | "method" => {
+                                // Medium priority - identifier captures, find parent
+                                let mut found_parent = None;
+                                let mut parent = node.parent();
+                                while let Some(p) = parent {
+                                    if (is_definition && (p.kind().contains("definition") || p.kind().contains("declaration"))) ||
+                                       (!is_definition && (p.kind().contains("call") || p.kind().contains("attribute") || p.kind().contains("expression"))) {
+                                        found_parent = Some(p);
+                                        break;
+                                    }
+                                    parent = p.parent();
+                                }
+                                if let Some(p) = found_parent {
+                                    (80, Some(p), content[p.start_byte()..p.end_byte()].to_string())
+                                } else {
+                                    (70, Some(node), matched_text.clone())
+                                }
+                            }
+                            "param" | "func_name" => {
+                                // Medium priority - parameter/function name captures, find function definition
+                                let mut found_func = None;
+                                let mut parent = node.parent();
+                                while let Some(p) = parent {
+                                    if p.kind() == "function_definition" {
+                                        found_func = Some(p);
+                                        break;
+                                    }
+                                    parent = p.parent();
+                                }
+                                if let Some(p) = found_func {
+                                    (85, Some(p), content[p.start_byte()..p.end_byte()].to_string())
+                                } else {
+                                    (60, Some(node), matched_text.clone())
+                                }
+                            }
+                            _ => {
+                                // Low priority - other captures
+                                (50, Some(node), matched_text.clone())
+                            }
+                        };
+                        
+                        // Update best capture if this one has higher priority
+                        if priority > best_priority {
+                            best_priority = priority;
+                            best_node = candidate_node;
+                            best_text = candidate_text;
+                        }
+                    }
+                    
+                    if let Some(node) = best_node {
+                        let start_byte = node.start_byte();
+                        let end_byte = node.end_byte();
+                        
+                        // Find the corresponding config based on pattern type and index
+                        let mut config_idx = 0;
+                        for config in &self.pattern_configs {
+                            let matches_type = match (&config.pattern_type, is_definition) {
+                                (PatternQuery::Definition { .. }, true) => true,
+                                (PatternQuery::Reference { .. }, false) => true,
+                                _ => false,
+                            };
+                            
+                            if matches_type {
+                                let current_pattern_type = self.get_pattern_type_for_config(config);
+                                if current_pattern_type == pattern_type {
+                                    if config_idx == query_idx {
+                                        pattern_matches.push(PatternMatch {
+                                            pattern_config: config.clone(),
+                                            pattern_type: pattern_type.clone(),
+                                            start_byte,
+                                            end_byte,
+                                            matched_text: best_text.clone(),
+                                        });
+                                        break;
+                                    }
+                                    config_idx += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        // Process all pattern types
+        let principals: Vec<PatternConfig> = self.pattern_configs.iter()
+            .filter(|c| self.get_pattern_type_for_config(c) == PatternType::Principal)
+            .cloned()
+            .collect();
+        let actions: Vec<PatternConfig> = self.pattern_configs.iter()
+            .filter(|c| self.get_pattern_type_for_config(c) == PatternType::Action)
+            .cloned()
+            .collect();
+        let resources: Vec<PatternConfig> = self.pattern_configs.iter()
+            .filter(|c| self.get_pattern_type_for_config(c) == PatternType::Resource)
+            .cloned()
+            .collect();
+
+        process_queries(&self.principal_definition_queries, PatternType::Principal, &principals, true);
+        process_queries(&self.principal_reference_queries, PatternType::Principal, &principals, false);
+        process_queries(&self.action_definition_queries, PatternType::Action, &actions, true);
+        process_queries(&self.action_reference_queries, PatternType::Action, &actions, false);
+        process_queries(&self.resource_definition_queries, PatternType::Resource, &resources, true);
+        process_queries(&self.resource_reference_queries, PatternType::Resource, &resources, false);
+
+        pattern_matches
+    }
+
+    fn get_pattern_type_for_config(&self, config: &PatternConfig) -> PatternType {
+        // Determine pattern type based on position in pattern_configs
+        let config_position = self.pattern_configs.iter().position(|c| c.description == config.description).unwrap_or(0);
+        
+        let principals_count = self.principal_definition_queries.len() + self.principal_reference_queries.len();
+        let actions_count = self.action_definition_queries.len() + self.action_reference_queries.len();
+        
+        if config_position < principals_count {
+            PatternType::Principal
+        } else if config_position < principals_count + actions_count {
+            PatternType::Action
+        } else {
+            PatternType::Resource
+        }
     }
 
     fn load_patterns(root_dir: Option<&Path>) -> HashMap<Language, LanguagePatterns> {
@@ -190,7 +540,7 @@ impl SecurityRiskPatterns {
 
         let mut map = HashMap::new();
 
-        // Load patterns from individual language files
+        // Load patterns from individual language files (tree-sitter only)
         let languages = [
             (Python, include_str!("patterns/python.yml")),
             (JavaScript, include_str!("patterns/javascript.yml")),
@@ -201,11 +551,12 @@ impl SecurityRiskPatterns {
             (Ruby, include_str!("patterns/ruby.yml")),
             (C, include_str!("patterns/c.yml")),
             (Cpp, include_str!("patterns/cpp.yml")),
-            (Terraform, include_str!("patterns/terraform.yml")),
-            (Kubernetes, include_str!("patterns/kubernetes.yml")),
-            (Yaml, include_str!("patterns/yaml.yml")),
-            (Bash, include_str!("patterns/bash.yml")),
             (Php, include_str!("patterns/php.yml")),
+            // Temporarily disabled regex-based patterns until full migration:
+            // (Terraform, include_str!("patterns/terraform.yml")),
+            // (Kubernetes, include_str!("patterns/kubernetes.yml")),
+            // (Yaml, include_str!("patterns/yaml.yml")),
+            // (Bash, include_str!("patterns/bash.yml")),
         ];
 
         for (lang, content) in languages {

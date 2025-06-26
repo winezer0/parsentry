@@ -2,12 +2,15 @@
 name = "parsentry"
 version = "0.7.0"
 edition = "2024"
+default-run = "parsentry"
 
 [build-dependencies]
 cc = "1.0"
 
 [features]
+default = []
 snapshot-test = []
+benchmark = []
 
 [dependencies]
 tree-sitter = "0.25.6"
@@ -30,6 +33,9 @@ genai = "0.3.5"
 futures = { version = "0.3", features = ["thread-pool"] }
 tree-sitter-ruby = "0.20"
 indicatif = "0.17"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 insta = { version = "1.42.0", features = ["yaml"] }
@@ -41,3 +47,72 @@ exclude = ["tree-sitter-*"]
 
 [workspace.metadata.insta]
 snapshot-path = "tests/snapshots"
+
+# APIを使用するテストの設定
+[[test]]
+name = "accuracy_test_suite"
+path = "tests/accuracy_test_suite.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "analyzer_test"
+path = "tests/analyzer_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "analyzer_unit_test"
+path = "tests/analyzer_unit_test.rs"
+
+[[test]]
+name = "context_quality_accuracy_test"
+path = "tests/context_quality_accuracy_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "end_to_end_accuracy_test"
+path = "tests/end_to_end_accuracy_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "external_benchmark_integration_test"
+path = "tests/external_benchmark_integration_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "par_classification_accuracy_test"
+path = "tests/par_classification_accuracy_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "prompt_accuracy_unit_test"
+path = "tests/prompt_accuracy_unit_test.rs"
+
+[[test]]
+name = "prompt_slo_test"
+path = "tests/prompt_slo_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "real_world_benchmark_test"
+path = "tests/real_world_benchmark_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "performance_benchmark_test"
+path = "tests/performance_benchmark_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "nodejs_performance_benchmark_test"
+path = "tests/nodejs_performance_benchmark_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "django_performance_benchmark_test"
+path = "tests/django_performance_benchmark_test.rs"
+required-features = ["benchmark"]
+
+[[test]]
+name = "spring_boot_performance_benchmark_test"
+path = "tests/spring_boot_performance_benchmark_test.rs"
+required-features = ["benchmark"]

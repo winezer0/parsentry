@@ -78,7 +78,8 @@ fn filter_files_by_size(files: &[PathBuf], max_lines: usize) -> Result<Vec<PathB
 pub struct PatternClassification {
     pub function_name: String,
     pub pattern_type: Option<String>,
-    pub pattern: String,
+    pub query_type: String, // "definition" or "reference"
+    pub query: String,      // tree-sitter query instead of regex pattern
     pub description: String,
     pub reasoning: String,
     pub attack_vector: Vec<String>,
@@ -318,18 +319,16 @@ async fn analyze_all_definitions_at_once(
 {}
 
 For each function, determine if it should be classified as:
-- "principals": Sources that act as data entry points and should be treated as tainted/untrusted. This includes:
-  * User input functions (request handlers, form parsers, parameter getters)
-  * External data sources (API responses, file readers, database queries)
-  * Network/communication inputs (socket data, HTTP requests, message queues)
-  * Environment/configuration readers that could be attacker-controlled
-  * Second-order data sources (data previously stored from user input)
-  * Any function that introduces data from outside the application's control boundary
+- "principals": Sources that act as data entry points and should be treated as tainted/untrusted
 - "actions": Functions that perform validation, sanitization, authorization, or security operations  
 - "resources": Functions that access, modify, or perform operations on files, databases, networks, or system resources
 - "none": Not a security pattern
 
-Focus especially on identifying principals that represent sources in source-sink analysis patterns. These are the starting points where untrusted data enters the application.
+Generate tree-sitter queries instead of regex patterns. Use the following format:
+
+IMPORTANT: For definition patterns, add @function capture to the entire function_definition.
+For reference patterns, add @call capture to the entire call_expression or @attribute capture to the entire attribute access.
+This ensures we capture the complete context, not just the identifier names.
 
 Return a JSON object with this structure:
 
@@ -338,7 +337,8 @@ Return a JSON object with this structure:
     {{
       "classification": "principals|actions|resources|none",
       "function_name": "function_name",
-      "pattern": "\\\\bfunction_name\\\\s*\\\\(",
+      "query_type": "definition",
+      "query": "(function_definition name: (identifier) @name (#eq? @name \"function_name\")) @function",
       "description": "Brief description of what this pattern detects",
       "reasoning": "Why this function fits this classification",
       "attack_vector": ["T1234", "T5678"]
@@ -346,8 +346,8 @@ Return a JSON object with this structure:
   ]
 }}
 
-All fields are required for each object."#,
-        language, definitions_context
+All fields are required for each object. Use proper tree-sitter query syntax for the {:?} language."#,
+        language, definitions_context, language
     );
 
     let response_schema = serde_json::json!({
@@ -360,7 +360,8 @@ All fields are required for each object."#,
                     "properties": {
                         "classification": {"type": "string", "enum": ["principals", "actions", "resources", "none"]},
                         "function_name": {"type": "string"},
-                        "pattern": {"type": "string"},
+                        "query_type": {"type": "string", "enum": ["definition", "reference"]},
+                        "query": {"type": "string"},
                         "description": {"type": "string"},
                         "reasoning": {"type": "string"},
                         "attack_vector": {
@@ -368,7 +369,7 @@ All fields are required for each object."#,
                             "items": {"type": "string"}
                         }
                     },
-                    "required": ["classification", "function_name", "pattern", "description", "reasoning", "attack_vector"]
+                    "required": ["classification", "function_name", "query_type", "query", "description", "reasoning", "attack_vector"]
                 }
             }
         },
@@ -398,7 +399,8 @@ All fields are required for each object."#,
     struct PatternResponse {
         classification: String,
         function_name: String,
-        pattern: String,
+        query_type: String,
+        query: String,
         description: String,
         reasoning: String,
         attack_vector: Vec<String>,
@@ -416,7 +418,8 @@ All fields are required for each object."#,
             patterns.push(PatternClassification {
                 function_name: pattern_resp.function_name,
                 pattern_type: Some(pattern_resp.classification),
-                pattern: pattern_resp.pattern,
+                query_type: pattern_resp.query_type,
+                query: pattern_resp.query,
                 description: pattern_resp.description,
                 reasoning: pattern_resp.reasoning,
                 attack_vector: pattern_resp.attack_vector,
@@ -474,6 +477,12 @@ For each function reference, determine if it should be classified as:
 
 Focus especially on identifying principals that represent sources in source-sink analysis patterns. These are the starting points where untrusted data enters the application.
 
+Generate tree-sitter queries instead of regex patterns. Use the following format:
+
+IMPORTANT: For definition patterns, add @function capture to the entire function_definition.
+For reference patterns, add @call capture to the entire call_expression or @attribute capture to the entire attribute access.
+This ensures we capture the complete context, not just the identifier names.
+
 Return a JSON object with this structure:
 
 {{
@@ -481,7 +490,8 @@ Return a JSON object with this structure:
     {{
       "classification": "principals|actions|resources|none",
       "function_name": "function_name",
-      "pattern": "\\\\bfunction_name\\\\s*\\\\(",
+      "query_type": "reference",
+      "query": "(call_expression function: (identifier) @name (#eq? @name \"function_name\")) @call",
       "description": "Brief description of what this pattern detects",
       "reasoning": "Why this function call fits this classification",
       "attack_vector": ["T1234", "T5678"]
@@ -489,8 +499,8 @@ Return a JSON object with this structure:
   ]
 }}
 
-All fields are required for each object."#,
-        language, references_context
+All fields are required for each object. Use proper tree-sitter query syntax for the {:?} language."#,
+        language, references_context, language
     );
 
     let response_schema = serde_json::json!({
@@ -503,7 +513,8 @@ All fields are required for each object."#,
                     "properties": {
                         "classification": {"type": "string", "enum": ["principals", "actions", "resources", "none"]},
                         "function_name": {"type": "string"},
-                        "pattern": {"type": "string"},
+                        "query_type": {"type": "string", "enum": ["definition", "reference"]},
+                        "query": {"type": "string"},
                         "description": {"type": "string"},
                         "reasoning": {"type": "string"},
                         "attack_vector": {
@@ -511,7 +522,7 @@ All fields are required for each object."#,
                             "items": {"type": "string"}
                         }
                     },
-                    "required": ["classification", "function_name", "pattern", "description", "reasoning", "attack_vector"]
+                    "required": ["classification", "function_name", "query_type", "query", "description", "reasoning", "attack_vector"]
                 }
             }
         },
@@ -541,7 +552,8 @@ All fields are required for each object."#,
     struct PatternResponse {
         classification: String,
         function_name: String,
-        pattern: String,
+        query_type: String,
+        query: String,
         description: String,
         reasoning: String,
         attack_vector: Vec<String>,
@@ -559,7 +571,8 @@ All fields are required for each object."#,
             patterns.push(PatternClassification {
                 function_name: pattern_resp.function_name,
                 pattern_type: Some(pattern_resp.classification),
-                pattern: pattern_resp.pattern,
+                query_type: pattern_resp.query_type,
+                query: pattern_resp.query,
                 description: pattern_resp.description,
                 reasoning: pattern_resp.reasoning,
                 attack_vector: pattern_resp.attack_vector,
@@ -624,8 +637,15 @@ pub fn write_patterns_to_file(
         yaml_content.push_str("  principals:\n");
         for pattern in principals {
             yaml_content.push_str(&format!(
-                "    - pattern: \"{}\"\n      description: \"{}\"\n",
-                pattern.pattern.replace("\\", "\\\\"),
+                "    - {}: |\n",
+                pattern.query_type
+            ));
+            // Add indented query
+            for line in pattern.query.lines() {
+                yaml_content.push_str(&format!("        {}\n", line));
+            }
+            yaml_content.push_str(&format!(
+                "      description: \"{}\"\n",
                 pattern.description
             ));
             yaml_content.push_str("      attack_vector:\n");
@@ -643,8 +663,15 @@ pub fn write_patterns_to_file(
         yaml_content.push_str("  actions:\n");
         for pattern in actions {
             yaml_content.push_str(&format!(
-                "    - pattern: \"{}\"\n      description: \"{}\"\n",
-                pattern.pattern.replace("\\", "\\\\"),
+                "    - {}: |\n",
+                pattern.query_type
+            ));
+            // Add indented query
+            for line in pattern.query.lines() {
+                yaml_content.push_str(&format!("        {}\n", line));
+            }
+            yaml_content.push_str(&format!(
+                "      description: \"{}\"\n",
                 pattern.description
             ));
             yaml_content.push_str("      attack_vector:\n");
@@ -662,8 +689,15 @@ pub fn write_patterns_to_file(
         yaml_content.push_str("  resources:\n");
         for pattern in resources {
             yaml_content.push_str(&format!(
-                "    - pattern: \"{}\"\n      description: \"{}\"\n",
-                pattern.pattern.replace("\\", "\\\\"),
+                "    - {}: |\n",
+                pattern.query_type
+            ));
+            // Add indented query
+            for line in pattern.query.lines() {
+                yaml_content.push_str(&format!("        {}\n", line));
+            }
+            yaml_content.push_str(&format!(
+                "      description: \"{}\"\n",
                 pattern.description
             ));
             yaml_content.push_str("      attack_vector:\n");
